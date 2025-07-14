@@ -8,6 +8,7 @@ import { Octokit } from "@octokit/rest";
 
 export const config = {
   api: { bodyParser: false },
+  runtime: 'nodejs',
 };
 
 const DEFAULT_INDEX = `<!DOCTYPE html>
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
       indexSha = idx.data.sha;
       html = Buffer.from(idx.data.content, "base64").toString("utf8");
       if (!html.trim()) html = DEFAULT_INDEX;
-    } catch (err: any) {
+    } catch (err) {
       if (err.status === 404) {
         html = DEFAULT_INDEX;
         indexSha = null;
