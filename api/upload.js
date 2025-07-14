@@ -2,7 +2,8 @@
 
 import fs from "fs";
 import path from "path";
-import formidable from "formidable";
+// IncomingForm を直接インポート
+import { IncomingForm } from "formidable";
 import { Octokit } from "@octokit/rest";
 
 export const config = {
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     }
 
     // --- multipart/form-data を formidable でパース ---
-    const form = new formidable.IncomingForm({
+    const form = new IncomingForm({
       maxFileSize: 2 * 1024 * 1024,
     });
     const { fields, files } = await new Promise((ful, rej) => {
@@ -61,6 +62,7 @@ export default async function handler(req, res) {
       });
     });
 
+    // 必須フィールドチェック
     const { owner, repo, path: filePath, linkText, scenarioName } =
       fields;
     if (!owner || !repo || !filePath || !linkText || !scenarioName) {
@@ -69,7 +71,7 @@ export default async function handler(req, res) {
         .json({ ok: false, error: "Missing parameters" });
     }
 
-    // --- ファイルの一時パスを取得 (formidable v2: filepath, v1: path) ---
+    // ファイルの一時パスを取得 (formidable v2: filepath, v1: path)
     const htmlFile = files.htmlFile;
     const tempPath = htmlFile?.filepath || htmlFile?.path;
     if (!htmlFile || typeof tempPath !== "string") {
@@ -101,7 +103,7 @@ export default async function handler(req, res) {
       indexSha = idx.data.sha;
       html = Buffer.from(idx.data.content, "base64").toString("utf8");
       if (!html.trim()) html = DEFAULT_INDEX;
-    } catch (err) {
+    } catch (err: any) {
       if (err.status === 404) {
         html = DEFAULT_INDEX;
         indexSha = null;
@@ -173,58 +175,36 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
       commit_sha: baseCommitSha,
     });
 
-    // tree アイテム
+    // tree アイテム配列
     const treeItems = [
       { path: filePath, mode: "100644", type: "blob", sha: logBlob.sha },
       { path: "index.html", mode: "100644", type: "blob", sha: idxBlob.sha },
     ];
 
-    // norobot.js がなければ追加
-    try {
-      await octokit.repos.getContent({ owner, repo, path: "norobot.js" });
-    } catch (e) {
-      if (e.status === 404) {
-        const nb = fs.readFileSync(
-          path.join(process.cwd(), "public", "norobot.js")
-        );
-        const { data } = await octokit.git.createBlob({
-          owner,
-          repo,
-          content: nb.toString("base64"),
-          encoding: "base64",
-        });
-        treeItems.push({
-          path: "norobot.js",
-          mode: "100644",
-          type: "blob",
-          sha: data.sha,
-        });
+    // norobot.js / loglist.js を必要に応じて追加
+    for (const asset of ["norobot.js", "loglist.js"]) {
+      try {
+        await octokit.repos.getContent({ owner, repo, path: asset });
+      } catch (e: any) {
+        if (e.status === 404) {
+          const blob = fs.readFileSync(path.join(process.cwd(), "public", asset));
+          const { data } = await octokit.git.createBlob({
+            owner,
+            repo,
+            content: blob.toString("base64"),
+            encoding: "base64",
+          });
+          treeItems.push({
+            path: asset,
+            mode: "100644",
+            type: "blob",
+            sha: data.sha,
+          });
+        }
       }
     }
 
-    // loglist.js がなければ追加
-    try {
-      await octokit.repos.getContent({ owner, repo, path: "loglist.js" });
-    } catch (e) {
-      if (e.status === 404) {
-        const lb = fs.readFileSync(
-          path.join(process.cwd(), "public", "loglist.js")
-        );
-        const { data } = await octokit.git.createBlob({
-          owner,
-          repo,
-          content: lb.toString("base64"),
-          encoding: "base64",
-        });
-        treeItems.push({
-          path: "loglist.js",
-          mode: "100644",
-          type: "blob",
-          sha: data.sha,
-        });
-      }
-    }
-
+    // tree→commit→ref update
     const { data: newTree } = await octokit.git.createTree({
       owner,
       repo,
@@ -247,7 +227,7 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
 
     // 成功レスポンス
     return res.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Upload API error:", err);
     return res
       .status(500)
