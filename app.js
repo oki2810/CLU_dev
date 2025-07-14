@@ -219,79 +219,74 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // --- GitHub へのコミット ---
-      githubUploadBtn.addEventListener("click", async () => {
-          if (!requireRepo()) return;
-          const repo = repoInput.value.trim();
-          const path = pathInput.value.trim();
-          const scenarioName = filenameInput.value.trim();
-          const linkText = scenarioName;
-
-          // ← ここで hidden input に値をセット
-          document.getElementById("ownerInput").value = ownerName;
-          document.getElementById("linkTextInput").value = linkText;
-
-          if (!formattedOutput.textContent) return alert("まずは「修正」ボタンで整形してください");
-          if (!ownerName || !path) return alert("リポジトリ情報をすべて入力してください");
-
-          githubStatus.textContent = "送信中…";
-          try {
-            const formData = new FormData();
-            formData.append("htmlFile", uploadHtml.files[0]);
-            formData.append("owner", ownerInput.value);
-            formData.append("repo", repo);
-            formData.append("path", path);
-            formData.append("linkText", linkTextInput.value);
-            formData.append("scenarioName", scenarioName);
-
-            if (!out) return alert("まずは「修正」ボタンで整形してください");
-            if (!ownerName || !path)
-              return alert("リポジトリ情報をすべて入力してください");
-
-            githubStatus.textContent = "送信中…";
-            try {
-              const formData = new FormData();
-              formData.append("htmlFile", uploadHtml.files[0]);
-              formData.append("owner", ownerName);
-              formData.append("repo", repo);
-              formData.append("path", path);
-              formData.append("linkText", linkText);
-              formData.append("scenarioName", scenarioName);
-
-              const response = await fetch("/api/upload", {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                  "X-CSRF-Token": getCsrfToken()
-                },
-                body: formData,
-              });
-
-              // ★ まずはテキストとして全体を取得 ★
-              const text = await response.text();
-              console.log("🔥 /api/upload からの生レスポンス:", text);
-
-              // そこから JSON パースを試みる
-              let result;
-              try {
-                result = JSON.parse(text);
-              } catch (e) {
-                console.error("❌ JSON じゃないのでパースできませんでした。");
-                throw e;
-              }
-
-              if (result.ok) {
-                githubStatus.innerHTML =
-                  '<div class="alert alert-success">GitHub へのコミットに成功しました！</div>';
-              } else {
-                githubStatus.innerHTML =
-                  `<div class="alert alert-danger">エラー：${result.error}</div>`;
-              }
-            } catch (err) {
-              console.error("通信中にエラー:", err);
-              githubStatus.innerHTML =
-                '<div class="alert alert-danger">通信エラーが発生しました</div>';
-            }
+     githubUploadBtn.addEventListener("click", async () => {
+        if (!requireRepo()) return;
+      
+        const repo         = repoInput.value.trim();
+        const path         = pathInput.value.trim();
+        const scenarioName = filenameInput.value.trim();
+        const linkText     = scenarioName;
+      
+        // hidden input に値をセット
+        document.getElementById("ownerInput").value    = ownerName;
+        document.getElementById("linkTextInput").value = linkText;
+      
+        if (!formattedOutput.textContent) {
+          return alert("まずは「修正」ボタンで整形してください");
+        }
+        if (!ownerName || !path) {
+          return alert("リポジトリ情報をすべて入力してください");
+        }
+      
+        githubStatus.textContent = "送信中…";
+      
+        try {
+          // 1) FormData 組み立て
+          const formData = new FormData();
+          formData.append("htmlFile",      uploadHtml.files[0]);
+          formData.append("owner",         document.getElementById("ownerInput").value);
+          formData.append("repo",          repo);
+          formData.append("path",          path);
+          formData.append("linkText",      document.getElementById("linkTextInput").value);
+          formData.append("scenarioName",  scenarioName);
+      
+          // 2) サーバーへ送信
+          const response = await fetch("/api/upload", {
+            method:      "POST",
+            credentials: "include",
+            headers:     { "X-CSRF-Token": getCsrfToken() },
+            body:        formData,
           });
+      
+          // 3) テキスト取得＆ログ
+          const text = await response.text();
+          console.log("🔥 /api/upload からの生レスポンス:", text);
+      
+          // 4) JSON パース（ここも try…catch する）
+          let result;
+          try {
+            result = JSON.parse(text);
+          } catch (e) {
+            console.error("❌ JSON じゃないのでパースできませんでした。", e);
+            throw e;  // 外側の catch に飛ばす
+          }
+      
+          // 5) 結果表示
+          if (result.ok) {
+            githubStatus.innerHTML =
+              '<div class="alert alert-success">GitHub へのコミットに成功しました！</div>';
+          } else {
+            githubStatus.innerHTML =
+              `<div class="alert alert-danger">エラー：${result.error}</div>`;
+          }
+      
+        } catch (err) {
+          // ← ここの catch がないと「Missing catch」になります
+          console.error("通信中にエラー:", err);
+          githubStatus.innerHTML =
+            '<div class="alert alert-danger">通信エラーが発生しました</div>';
+        }
+      });  // ← ここまでで addEventListener のコールバック全体が閉じています
 
         // --- HTML 整形 ---
         formatBtn.addEventListener("click", () => {
