@@ -1,12 +1,12 @@
+// pages/api/upload.js
+
 import fs from "fs";
 import path from "path";
-import { IncomingForm } from "formidable";
+import formidable from "formidable";
 import { Octokit } from "@octokit/rest";
 
 export const config = {
-  api: {
-    bodyParser: false,
-  },
+  api: { bodyParser: false },
 };
 
 const DEFAULT_INDEX = `<!DOCTYPE html>
@@ -31,7 +31,9 @@ const DEFAULT_INDEX = `<!DOCTYPE html>
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+    return res
+      .status(405)
+      .json({ ok: false, error: "Method Not Allowed" });
   }
 
   try {
@@ -43,11 +45,15 @@ export default async function handler(req, res) {
     );
     const token = cookies.access_token;
     if (!token) {
-      return res.status(401).json({ ok: false, error: "Unauthorized" });
+      return res
+        .status(401)
+        .json({ ok: false, error: "Unauthorized" });
     }
 
     // --- multipart/form-data を formidable でパース ---
-    const form = new IncomingForm({ maxFileSize: 2 * 1024 * 1024 });
+    const form = new formidable.IncomingForm({
+      maxFileSize: 2 * 1024 * 1024,
+    });
     const { fields, files } = await new Promise((ful, rej) => {
       form.parse(req, (err, fields, files) => {
         if (err) return rej(err);
@@ -55,13 +61,18 @@ export default async function handler(req, res) {
       });
     });
 
-    const { owner, repo, path: filePath, linkText, scenarioName } = fields;
+    const { owner, repo, path: filePath, linkText, scenarioName } =
+      fields;
     if (!owner || !repo || !filePath || !linkText || !scenarioName) {
       return res
         .status(400)
         .json({ ok: false, error: "Missing parameters" });
     }
-    if (!files.htmlFile || typeof files.htmlFile.filepath !== "string") {
+
+    // --- ファイルの一時パスを取得 (formidable v2: filepath, v1: path) ---
+    const htmlFile = files.htmlFile;
+    const tempPath = htmlFile?.filepath || htmlFile?.path;
+    if (!htmlFile || typeof tempPath !== "string") {
       return res
         .status(400)
         .json({ ok: false, error: "No file uploaded" });
@@ -69,8 +80,8 @@ export default async function handler(req, res) {
 
     const octokit = new Octokit({ auth: token });
 
-    // 1) ログファイルを blob 化
-    const buffer = fs.readFileSync(files.htmlFile.filepath);
+    // 1) アップロードされたログファイルを blob 化
+    const buffer = fs.readFileSync(tempPath);
     const fileB64 = buffer.toString("base64");
     const { data: logBlob } = await octokit.git.createBlob({
       owner,
@@ -80,8 +91,7 @@ export default async function handler(req, res) {
     });
 
     // 2) index.html を取得。なければ DEFAULT_INDEX を使う
-    let html;
-    let indexSha;
+    let html, indexSha;
     try {
       const idx = await octokit.repos.getContent({
         owner,
@@ -113,18 +123,15 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
     // 4) 新規 <li> ブロックを組み立て
     const timestamp = new Date().toISOString();
     const newItem = `
-<li
-  class="list-group-item d-flex justify-content-between align-items-center"
-  data-date="${timestamp}"
-  data-path="${filePath}"
+<li class="list-group-item d-flex justify-content-between align-items-center"
+    data-date="${timestamp}"
+    data-path="${filePath}"
 >
   <span>
     <span class="text-muted">${scenarioName}</span>
     <a href="${filePath}" class="ms-2">${linkText}</a>
   </span>
-  <button type="button" class="btn btn-sm btn-danger btn-delete">
-    削除
-  </button>
+  <button type="button" class="btn btn-sm btn-danger btn-delete">削除</button>
 </li>
 `.trim();
 
@@ -141,7 +148,7 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
       );
     }
 
-    // 6) 更新後の index.html も blob 化
+    // 6) 更新後の index.html を blob 化
     const { data: idxBlob } = await octokit.git.createBlob({
       owner,
       repo,
@@ -149,12 +156,16 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
       encoding: "base64",
     });
 
-    // 7) 単一コミットでまとめてプッシュ(tree→commit→ref update)
+    // 7) 単一コミットでまとめてプッシュ (tree→commit→ref update)
     const { data: repoInfo } = await octokit.repos.get({ owner, repo });
     const branch = repoInfo.default_branch;
     const {
       data: refData,
-    } = await octokit.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    } = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    });
     const baseCommitSha = refData.object.sha;
     const { data: baseCommit } = await octokit.git.getCommit({
       owner,
@@ -162,7 +173,7 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
       commit_sha: baseCommitSha,
     });
 
-    // tree に載せるアイテム
+    // tree アイテム
     const treeItems = [
       { path: filePath, mode: "100644", type: "blob", sha: logBlob.sha },
       { path: "index.html", mode: "100644", type: "blob", sha: idxBlob.sha },
@@ -188,8 +199,6 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
           type: "blob",
           sha: data.sha,
         });
-      } else {
-        throw e;
       }
     }
 
@@ -213,12 +222,9 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
           type: "blob",
           sha: data.sha,
         });
-      } else {
-        throw e;
       }
     }
 
-    // tree→commit→ref update
     const { data: newTree } = await octokit.git.createTree({
       owner,
       repo,
@@ -239,11 +245,12 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
       sha: newCommit.sha,
     });
 
+    // 成功レスポンス
     return res.json({ ok: true });
   } catch (err) {
     console.error("Upload API error:", err);
     return res
       .status(500)
-      .json({ ok: false, error: err.message ?? "Unknown error" });
+      .json({ ok: false, error: err.message || "Unknown error" });
   }
 }
