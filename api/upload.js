@@ -186,7 +186,7 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
     for (const asset of ["norobot.js", "loglist.js"]) {
       try {
         await octokit.repos.getContent({ owner, repo, path: asset });
-      } catch (e: any) {
+      } catch (e) {
         if (e.status === 404) {
           const blob = fs.readFileSync(path.join(process.cwd(), "public", asset));
           const { data } = await octokit.git.createBlob({
