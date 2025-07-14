@@ -68,23 +68,26 @@ export default async function handler(req, res) {
     console.log('files:', files);
 
     // 必須フィールドチェック
-    const { owner, repo, path: filePath, linkText, scenarioName } =
-      fields;
+    const owner = Array.isArray(fields.owner)        ? fields.owner[0]        : fields.owner;
+    const repo  = Array.isArray(fields.repo)         ? fields.repo[0]         : fields.repo;
+    const filePath = Array.isArray(fields.path)      ? fields.path[0]         : fields.path;
+    const linkText = Array.isArray(fields.linkText)  ? fields.linkText[0]     : fields.linkText;
+    const scenarioName = Array.isArray(fields.scenarioName)
+                          ? fields.scenarioName[0]
+                          : fields.scenarioName;
+
     if (!owner || !repo || !filePath || !linkText || !scenarioName) {
       return res
         .status(400)
         .json({ ok: false, error: "Missing parameters" });
     }
 
-    // ファイルの一時パスを取得 (formidable v2: filepath, v1: path)
-    const htmlFile = files.htmlFile;
+    let htmlFile = files.htmlFile;
+    if (Array.isArray(htmlFile)) htmlFile = htmlFile[0];
     const tempPath = htmlFile.filepath || htmlFile.path;
     if (!htmlFile || typeof tempPath !== "string") {
-      return res
-        .status(400)
-        .json({ ok: false, error: "No file uploaded" });
+      return res.status(400).json({ ok: false, error: "No file uploaded" });
     }
-
     const octokit = new Octokit({ auth: token });
 
     // 1) アップロードされたログファイルを blob 化
