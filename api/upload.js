@@ -54,6 +54,7 @@ export default async function handler(req, res) {
 
     // --- multipart/form-data を formidable でパース ---
     const form = new IncomingForm({
+      multiples: false,
       maxFileSize: 2 * 1024 * 1024,
     });
     const { fields, files } = await new Promise((ful, rej) => {
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
 
     // ファイルの一時パスを取得 (formidable v2: filepath, v1: path)
     const htmlFile = files.htmlFile;
-    const tempPath = htmlFile?.filepath || htmlFile?.path;
+    const tempPath = htmlFile.filepath || htmlFile.path;
     if (!htmlFile || typeof tempPath !== "string") {
       return res
         .status(400)
