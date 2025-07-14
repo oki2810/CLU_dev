@@ -63,6 +63,9 @@ export default async function handler(req, res) {
       });
     });
 
+    console.log('fields:', fields);
+    console.log('files:', files);
+
     // 必須フィールドチェック
     const { owner, repo, path: filePath, linkText, scenarioName } =
       fields;
