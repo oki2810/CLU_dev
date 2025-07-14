@@ -228,7 +228,7 @@ window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
 
     // 成功レスポンス
     return res.json({ ok: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Upload API error:", err);
     return res
       .status(500)
