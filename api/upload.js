@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import formidable from "formidable";
+import { IncomingForm } from "formidable";
 import { Octokit } from "@octokit/rest";
 
 export const config = {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     }
 
     // --- multipart/form-data を formidable でパース ---
-    const form = new formidable.IncomingForm({ maxFileSize: 2 * 1024 * 1024 });
+    const form = new IncomingForm({ maxFileSize: 2 * 1024 * 1024 });
     const { fields, files } = await new Promise((ful, rej) => {
       form.parse(req, (err, fields, files) => {
         if (err) return rej(err);
