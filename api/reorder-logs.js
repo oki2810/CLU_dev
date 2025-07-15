@@ -65,20 +65,14 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     console.log("Processing OPTIONS request");
     
-    // 認証情報を取得
-    const authResult = await getAuthenticatedUser();
-    const userOrigin = authResult?.userOrigin;
-    
-    console.log(`Auth result: ${authResult ? 'success' : 'failed'}`);
-    
-    // Origin許可チェック
-    if (isOriginAllowed(origin, userOrigin)) {
-      console.log("OPTIONS request approved - setting CORS headers");
+    // プリフライトでは認証をスキップし、github.ioドメインのみチェック
+    if (origin && origin.endsWith('.github.io')) {
+      console.log("OPTIONS request approved - github.io domain detected");
       setCorsHeaders(res, origin);
       return res.status(200).end();
     }
     
-    console.log("OPTIONS request rejected - origin not allowed");
+    console.log("OPTIONS request rejected - not a github.io domain");
     return res.status(403).end();
   }
 
