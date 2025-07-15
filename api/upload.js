@@ -145,23 +145,38 @@ export default async function handler(req, res) {
   <button type="button" class="btn btn-sm btn-danger btn-delete">削除</button>
 </li>
 `.trim();
-
+    
     // 5) <ul id="log-list"> の中に差し込む
     const hasLogList = /<ul[\s\S]*?\bid=["']log-list["'][\s\S]*?>/i.test(html);
     if (!hasLogList) {
-      console.log('テンプレート内に log-list が見つからなかったため、デフォルト UL を挿入します');
+      // デフォルト UL の一発挿入はこれまで通り
       html = html.replace(
         /(<h2[^>]*>ログ一覧<\/h2>)/i,
         `$1\n<ul id="log-list" class="list-group"></ul>`
       );
-    } else {
-      console.log('テンプレート内に log-list を検出。デフォルト挿入スキップ');
-      // 5-a) 既存の UL があるなら <li> を差し込む
-      html = html.replace(
-        /(<ul[^>]+id=["']log-list["'][^>]*>)[\s\S]*?(<\/ul>)/i,
-        (_, open, close) => `${open}\n  ${newItem}\n${close}`
-      );
     }
+    
+    // ここで必ず「既存 UL がある or いま挿入したUL」に <li> マージをかける
+    html = html.replace(
+      /(<ul[^>]+id=["']log-list["'][^>]*>)([\s\S]*?)(<\/ul>)/i,
+      (_, openTag, oldInner, closeTag) => {
+        // oldInner にある既存の <li> を全部拾う
+        const existingItems = oldInner.match(/<li[\s\S]*?<\/li>/g) || [];
+        // newItem はアップロードされた分（定義済み）を追加
+        const allItems = [...existingItems, newItem];
+    
+        // 必要なら日付順ソートする
+        allItems.sort((a, b) => {
+          const da = a.match(/data-date="([^"]+)"/)[1];
+          const db = b.match(/data-date="([^"]+)"/)[1];
+          return new Date(db) - new Date(da); // 新しい順
+        });
+    
+        // join して戻す
+        const combined = allItems.join("\n  ");
+        return `${openTag}\n  ${combined}\n${closeTag}`;
+      }
+    );
 
     // 6) 更新後の index.html を blob 化
     const { data: idxBlob } = await octokit.git.createBlob({
