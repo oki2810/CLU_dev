@@ -157,9 +157,9 @@ export default async function handler(req, res) {
 
     // 4) <ul id="log-list"> を置き換え
     html = html.replace(
-      /(<h2[^>]*>ログ一覧<\/h2>\s*<ul[^>]*id=["']log-list["'][^>]*>)([\s\S]*?)(<\/ul>)/i,
-      (_, openTag, oldInner, closeTag) => {
-        console.log("Replacing <ul> contents:", { oldInnerLength: oldInner.length });
+      /(<div[^>]+class=["']container[^>]*>[\s\S]*?<h2[^>]*>ログ一覧<\/h2>\s*<ul[^>]+id=["']log-list["'][^>]*>)([\s\S]*?)(<\/ul>)/i,
+      (_, openTag, _oldInner, closeTag) => {
+        // newInner は事前に組み立て済みのソート後 <li> 群
         return `${openTag}\n${newInner}\n${closeTag}`;
       }
     );
