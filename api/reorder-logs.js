@@ -88,6 +88,17 @@ export default cors(async (req, res) => {
     );
 
     // --- 5) GitHub に再コミット ---
+    const payload = {
+      owner,
+      repo,
+      path: "public/index.html",
+      message: "Reorder logs via drag-and-drop",
+      content: Buffer.from(html, "utf8").toString("base64"),
+      sha,
+      branch,            // 念のためデフォルトブランチ名を渡しておく
+    };
+    console.log("→ PUT payload:", payload);
+    
     await octokit.request(
       "PUT /repos/{owner}/{repo}/contents/{+path}",
       {
