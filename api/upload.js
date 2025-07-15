@@ -99,7 +99,7 @@ export default async function handler(req, res) {
       encoding: "base64",
     });
 
-    // 2) index.html を取得。なければ DEFAULT_INDEX を使う
+    // 2) index.html を取得。なければエラー返却
     let html, indexSha;
     try {
       const idx = await octokit.repos.getContent({
@@ -109,14 +109,14 @@ export default async function handler(req, res) {
       });
       indexSha = idx.data.sha;
       html = Buffer.from(idx.data.content, "base64").toString("utf8");
-      if (!html.trim()) html = DEFAULT_INDEX;
     } catch (err) {
       if (err.status === 404) {
-        html = DEFAULT_INDEX;
-        indexSha = null;
-      } else {
-        throw err;
+        // index.html がまだ存在しない場合は初期設定を促してクライアントにエラー返却
+        return res
+          .status(400)
+          .json({ ok: false, error: "index.html が存在しません。まず初期設定を行ってください。" });
       }
+      throw err;
     }
 
     // 3) クライアント設定＆loglist.js 読み込みを挿入
@@ -129,7 +129,7 @@ export default async function handler(req, res) {
         /(<script\s+src=["']norobot\.js["']><\/script>)/,
         `${configScript}\n${loaderScript}\n$1`
       );
-  }
+    }
 
     // 4) 新規 <li> ブロックを組み立て
     const timestamp = new Date().toISOString();
