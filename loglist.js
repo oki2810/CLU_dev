@@ -1,50 +1,55 @@
-// CCU_template/loglist.js
+// loglist.js
+document.addEventListener("DOMContentLoaded", () => {
+  const list = document.getElementById("log-list");
+  const { owner, repo, apiBase } = window.CCU_CONFIG;
+  console.log("CCU_CONFIG:", window.CCU_CONFIG);
+  if (!list) return;
 
-document.addEventListener('DOMContentLoaded', () => {
-  const ul = document.getElementById('log-list');
-  if (!ul) return;
-
-  // 1) Sortable.js でドラッグ＆ドロップを有効化
-  Sortable.create(ul, {
+  // 1) Sortable.js でドラッグ＆ドロップ並べ替え
+  new Sortable(list, {
     animation: 150,
     onEnd: async () => {
-      // 並び順が変わったら、data-path の配列をサーバーに送信
-      const order = Array.from(ul.children).map(li => li.dataset.path);
-      const cfg = window.CCU_CONFIG || {};
-      const res = await fetch('/api/reorder-logs', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          owner: cfg.owner,
-          repo: cfg.repo,
-          order
-        })
+      // 並び順取得
+      const order = Array.from(list.children)
+        .map(li => li.dataset.path);
+      try {
+      await fetch(`${apiBase}/api/reorder-logs`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner, repo, order })
       });
-      const j = await res.json();
-      if (!j.ok) alert('並べ替えの保存に失敗しました: ' + j.error);
+      } catch (e) {
+        console.error("並べ替えコミットに失敗:", e);
+      }
     }
   });
 
-  // 2) 削除ボタン
-  ul.addEventListener('click', async e => {
-    if (!e.target.classList.contains('btn-delete')) return;
-    const li = e.target.closest('li');
+  // 2) 削除ボタンのハンドラ
+  list.addEventListener("click", async e => {
+    const btn = e.target.closest(".btn-delete");
+    if (!btn) return;
+    const li  = btn.closest("li");
     const path = li.dataset.path;
-    if (!confirm('本当にこのログを削除しますか？')) return;
+    
+    if (!confirm("このログを削除してもよいですか？")) return;
 
-    const cfg = window.CCU_CONFIG || {};
-    const res = await fetch('/api/delete-log', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ owner: cfg.owner, repo: cfg.repo, path })
-    });
-    const j = await res.json();
-    if (j.ok) {
-      li.remove();
-    } else {
-      alert('削除に失敗しました: ' + j.error);
+    try {
+      const res = await fetch(`${apiBase}/api/delete-log`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner, repo, path })
+      });
+      
+      const result = await res.json();
+      if (result.ok) {
+        li.remove();
+      } else {
+        console.error("削除エラー：", result.error);
+      }
+    } catch (err) {
+      console.error("削除リクエスト失敗：", err);
     }
   });
 });
