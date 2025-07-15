@@ -3,6 +3,9 @@ import { Octokit } from "@octokit/rest";
 export default async function handler(req, res) {
   const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN || "https://oki2810.github.io";
   const origin = req.headers.origin;
+  
+  console.log(`[${new Date().toISOString()}] ${req.method} request from origin: ${origin}`);
+  console.log(`TEMPLATE_ORIGIN: ${TEMPLATE_ORIGIN}`);
 
   // --- 共通の認証処理関数 ---
   const getAuthenticatedUser = async () => {
@@ -11,25 +14,47 @@ export default async function handler(req, res) {
     );
     const token = cookies.access_token;
     
-    if (!token) return null;
+    console.log(`Token exists: ${!!token}`);
+    if (token) {
+      console.log(`Token preview: ${token.substring(0, 10)}...`);
+    }
+    
+    if (!token) {
+      console.log("No access token found");
+      return null;
+    }
     
     try {
       const octokit = new Octokit({ auth: token });
       const { data: me } = await octokit.request("GET /user");
-      return { octokit, userOrigin: `https://${me.login}.github.io` };
-    } catch {
+      const userOrigin = `https://${me.login}.github.io`;
+      console.log(`Authenticated user: ${me.login}, userOrigin: ${userOrigin}`);
+      return { octokit, userOrigin };
+    } catch (error) {
+      console.log("Authentication failed:", error.message);
       return null;
     }
   };
 
   // --- Origin許可チェック関数 ---
   const isOriginAllowed = (origin, userOrigin) => {
-    if (!origin || !origin.endsWith('.github.io')) return false;
-    return origin === TEMPLATE_ORIGIN || origin === userOrigin;
+    console.log(`Checking origin: ${origin}`);
+    console.log(`Against TEMPLATE_ORIGIN: ${TEMPLATE_ORIGIN}`);
+    console.log(`Against userOrigin: ${userOrigin}`);
+    
+    if (!origin || !origin.endsWith('.github.io')) {
+      console.log("Origin rejected: not a github.io domain");
+      return false;
+    }
+    
+    const isAllowed = origin === TEMPLATE_ORIGIN || origin === userOrigin;
+    console.log(`Origin allowed: ${isAllowed}`);
+    return isAllowed;
   };
 
   // --- CORS ヘッダー設定 ---
   const setCorsHeaders = (res, origin) => {
+    console.log(`Setting CORS headers for origin: ${origin}`);
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -38,27 +63,37 @@ export default async function handler(req, res) {
 
   // --- OPTIONS (プリフライト) リクエスト処理 ---
   if (req.method === "OPTIONS") {
+    console.log("Processing OPTIONS request");
+    
     // 認証情報を取得
     const authResult = await getAuthenticatedUser();
     const userOrigin = authResult?.userOrigin;
     
+    console.log(`Auth result: ${authResult ? 'success' : 'failed'}`);
+    
     // Origin許可チェック
     if (isOriginAllowed(origin, userOrigin)) {
+      console.log("OPTIONS request approved - setting CORS headers");
       setCorsHeaders(res, origin);
       return res.status(200).end();
     }
     
+    console.log("OPTIONS request rejected - origin not allowed");
     return res.status(403).end();
   }
 
   // --- POST リクエスト処理 ---
   if (req.method !== "POST") {
+    console.log(`Method not allowed: ${req.method}`);
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
+
+  console.log("Processing POST request");
 
   // 認証チェック
   const authResult = await getAuthenticatedUser();
   if (!authResult) {
+    console.log("POST request unauthorized");
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
 
@@ -66,8 +101,11 @@ export default async function handler(req, res) {
 
   // Origin許可チェック
   if (!isOriginAllowed(origin, userOrigin)) {
+    console.log("POST request origin not allowed");
     return res.status(403).json({ ok: false, error: "Origin not allowed" });
   }
+
+  console.log("POST request approved - proceeding with reorder logic");
 
   // CORSヘッダーを設定
   setCorsHeaders(res, origin);
@@ -75,10 +113,14 @@ export default async function handler(req, res) {
   // --- 並び替えロジック本体 ---
   try {
     const { owner, repo, order } = req.body;
+    console.log(`Request body: owner=${owner}, repo=${repo}, order length=${order?.length}`);
+    
     if (!owner || !repo || !Array.isArray(order)) {
+      console.log("Missing or invalid parameters");
       return res.status(400).json({ ok: false, error: "Missing parameters" });
     }
 
+    console.log("Getting repository content...");
     // ファイル取得
     const { data: idx } = await octokit.request(
       "GET /repos/{owner}/{repo}/contents/{+path}",
@@ -87,6 +129,7 @@ export default async function handler(req, res) {
     const sha = idx.sha;
     let html = Buffer.from(idx.content, "base64").toString("utf8");
 
+    console.log("Processing HTML content...");
     // <li> をマップ化
     const liMatches = Array.from(html.matchAll(/<li[\s\S]*?<\/li>/g));
     const liMap = {};
@@ -95,6 +138,8 @@ export default async function handler(req, res) {
       const dm = block.match(/data-path="([^"]+)"/);
       if (dm) liMap[dm[1]] = block;
     });
+
+    console.log(`Found ${liMatches.length} li elements, mapped ${Object.keys(liMap).length} with data-path`);
 
     // 新 innerHTML 組み立て
     const newInner = order.map((p) => liMap[p] || "").join("\n");
@@ -105,6 +150,7 @@ export default async function handler(req, res) {
       (m) => m.replace(/>[\s\S]*?(?=<\/ul>)/, `>\n${newInner}\n`)
     );
 
+    console.log("Committing updated content...");
     // 再コミット
     await octokit.request(
       "PUT /repos/{owner}/{repo}/contents/{+path}",
@@ -118,6 +164,7 @@ export default async function handler(req, res) {
       }
     );
 
+    console.log("Reorder completed successfully");
     return res.json({ ok: true });
   } catch (err) {
     console.error("Reorder API error:", err);
