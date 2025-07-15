@@ -43,6 +43,16 @@ export default cors(async (req, res) => {
 
     const octokit = new Octokit({ auth: token });
 
+    console.log("→ fetch target:", { owner, repo, path: "public/index.html" });
+    const { data: root } = await octokit.request(
+      "GET /repos/{owner}/{repo}/contents",
+      { owner, repo }
+    );
+    console.log(
+      "→ root contents:",
+      Array.isArray(root) ? root.map((f) => f.path) : root
+    );
+
     // --- 1) public/index.html を取得 ---
     console.log("→ fetching content:", { owner, repo, path: "public/index.html" });
     const { data: idx } = await octokit.request(
