@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const content = document.getElementById(contentId);
         if (!tab || !content) return;
         tab.addEventListener("click", () => {
-            // タブ見た目更新
+            console.log("clicked:", tabId, "→ show:", contentId, content);
             Object.keys(tabs).forEach(id => {
                 document.getElementById(id).classList.remove("active");
             });
