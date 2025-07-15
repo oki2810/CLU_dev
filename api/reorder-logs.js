@@ -23,8 +23,8 @@ export default async function handler(req, res) {
 
   // --- 2) プリフライトをユーザー OR テンプレどちらでも通す ---
   if (req.method === "OPTIONS") {
-    if (origin === TEMPLATE_ORIGIN || origin === userOrigin) {
-      res.setHeader("Access-Control-Allow-Origin", "*");
+    if (origin && origin.endsWith('.github.io')) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
@@ -33,24 +33,39 @@ export default async function handler(req, res) {
     return res.status(403).end();
   }
 
-  // --- 3) POST 以外拒否 ---
-  if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
-  }
+// POSTリクエスト時は認証をチェック
+if (req.method !== "POST") {
+  return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+}
 
-  // --- 4) 改めて認証＆ Origin チェック（POST 本体） ---
-  if (!token) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
-  }
-  if (origin !== TEMPLATE_ORIGIN && origin !== userOrigin) {
-    return res.status(403).json({ ok: false, error: "Origin not allowed" });
-  }
+// 認証とOriginチェック（POSTリクエスト時）
+const cookies = Object.fromEntries(
+  (req.headers.cookie || "").split("; ").map(c => c.split("="))
+);
+const token = cookies.access_token;
+if (!token) {
+  return res.status(401).json({ ok: false, error: "Unauthorized" });
+}
 
-  // --- 5) CORS ヘッダセット ＋ 並び替えロジック ---
-  res.setHeader("Access-Control-Allow-Origin",      origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
+// POSTリクエストでは認証した後にOriginチェック
+let userOrigin;
+try {
+  const octokit = new Octokit({ auth: token });
+  const { data: me } = await octokit.request("GET /user");
+  userOrigin = `https://${me.login}.github.io`;
+} catch {
+  return res.status(401).json({ ok: false, error: "Unauthorized" });
+}
+
+if (origin !== TEMPLATE_ORIGIN && origin !== userOrigin) {
+  return res.status(403).json({ ok: false, error: "Origin not allowed" });
+}
+
+// 認証済み、かつOriginが許可されたらCORSヘッダをセット
+res.setHeader("Access-Control-Allow-Origin", origin);
+res.setHeader("Access-Control-Allow-Credentials", "true");
+res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   // --- 並び替えロジック本体 -------------------
   try {
