@@ -1,10 +1,15 @@
 // pages/api/delete-log.js
 import { Octokit } from "@octokit/rest";
+import Cors from 'micro-cors';
+const cors = Cors({
+  origin: 'https://yoshikawa04.github.io',
+  allowCredentials: true,
+});
 
-export default async function handler(req, res) {
-  if (req.method !== "POST")
+export default cors(async (req, res) => {
+  if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
-
+  }
   const cookies = Object.fromEntries(
     (req.headers.cookie || "").split("; ").map(c => c.split("="))
   );
@@ -49,4 +54,4 @@ export default async function handler(req, res) {
     console.error("delete-log error:", err);
     return res.status(500).json({ ok: false, error: err.message });
   }
-}
+})
