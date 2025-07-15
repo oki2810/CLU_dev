@@ -121,14 +121,16 @@ export default async function handler(req, res) {
     }
 
     // 3) クライアント設定＆loglist.js 読み込みを挿入
-    const configScript = `<script>
-window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}' };
-</script>`;
-    const loaderScript = `<script src="loglist.js"></script>`;
-    html = html.replace(
-      /(<script\s+src=["']norobot\.js["']><\/script>)/,
-      `${configScript}\n${loaderScript}\n$1`
-    );
+    if (!html.includes('window.CCU_CONFIG')) {
+      const configScript = `<script>
+    window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}', apiBase: '${process.env.API_BASE_URL || 'https://clu-dev.vercel.app'}' };
+    </script>`;
+      const loaderScript = `<script src="loglist.js"></script>`;
+      html = html.replace(
+        /(<script\s+src=["']norobot\.js["']><\/script>)/,
+        `${configScript}\n${loaderScript}\n$1`
+      );
+  }
 
     // 4) 新規 <li> ブロックを組み立て
     const timestamp = new Date().toISOString();
