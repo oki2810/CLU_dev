@@ -8,6 +8,7 @@ const cors = Cors({
 });
 
 export default cors(async (req, res) => {
+  // プリフライト
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -42,19 +43,21 @@ export default cors(async (req, res) => {
 
     const octokit = new Octokit({ auth: token });
 
-    // 1) index.html を取得
-    const idx = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: "public/index.html",
-    });
-    const sha = idx.data.sha;
-    let html = Buffer.from(idx.data.content, "base64").toString("utf8");
-
-    // 2) <li> ブロックを抽出してパスをキーにマップ化
-    const liMatches = Array.from(
-      html.matchAll(/<li[\s\S]*?<\/li>/g)
+    // --- 1) public/index.html を取得 ---
+    console.log("→ fetching content:", { owner, repo, path: "public/index.html" });
+    const { data: idx } = await octokit.request(
+      "GET /repos/{owner}/{repo}/contents/{+path}",
+      {
+        owner,
+        repo,
+        path: "public/index.html"
+      }
     );
+    const sha  = idx.sha;
+    let   html = Buffer.from(idx.content, "base64").toString("utf8");
+
+    // --- 2) <li> ブロックを抽出してマップ化 ---
+    const liMatches = Array.from(html.matchAll(/<li[\s\S]*?<\/li>/g));
     const liMap = {};
     liMatches.forEach((m) => {
       const block = m[0];
@@ -62,29 +65,30 @@ export default cors(async (req, res) => {
       if (dm) liMap[dm[1]] = block;
     });
 
-    // 3) 新しい並び順で innerHTML を再構築
+    // --- 3) 新順序で innerHTML を組み立て ---
     const newInner = order.map((p) => liMap[p] || "").join("\n");
 
-    // 4) <ul id="log-list"> の中身を差し替え
+    // --- 4) <ul id="log-list"> の中身を差し替え ---
     html = html.replace(
       /<ul[^>]*id=["']log-list["'][^>]*>[\s\S]*?<\/ul>/,
-      (match) => {
-        return match.replace(
-          />[\s\S]*?(?=<\/ul>)/,
-          `>\n${newInner}\n`
-        );
-      }
+      (match) => match.replace(
+        />[\s\S]*?(?=<\/ul>)/,
+        `>\n${newInner}\n`
+      )
     );
 
-    // 5) GitHub に再コミット
-    await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path: "public/index.html",
-      message: "Reorder logs via drag-and-drop",
-      content: Buffer.from(html, "utf8").toString("base64"),
-      sha,
-    });
+    // --- 5) GitHub に再コミット ---
+    await octokit.request(
+      "PUT /repos/{owner}/{repo}/contents/{+path}",
+      {
+        owner,
+        repo,
+        path: "public/index.html",
+        message: "Reorder logs via drag-and-drop",
+        content: Buffer.from(html, "utf8").toString("base64"),
+        sha
+      }
+    );
 
     return res.json({ ok: true });
   } catch (err) {
@@ -93,4 +97,4 @@ export default cors(async (req, res) => {
       .status(500)
       .json({ ok: false, error: err.message ?? "Unknown error" });
   }
-})
+});
