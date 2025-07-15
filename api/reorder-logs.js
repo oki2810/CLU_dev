@@ -1,64 +1,55 @@
 import { Octokit } from "@octokit/rest";
 
 export default async function handler(req, res) {
-  console.log(
-    "🌟 TEMPLATE_ORIGIN:",
-    process.env.TEMPLATE_ORIGIN,
-    "– incoming Origin:",
-    req.headers.origin
-  );
   const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN || "https://oki2810.github.io";
   const origin = req.headers.origin;
 
-  // プリフライト（認証不要）-------------------
-  if (req.method === "OPTIONS") {
-    if (origin === TEMPLATE_ORIGIN) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-      return res.status(200).end();
-    } else {
-      return res.status(403).end();
+  // --- 1) トークン取得（OPTIONS でも認証付きプリフライトを通すため） ---
+  const cookies = Object.fromEntries(
+    (req.headers.cookie || "").split("; ").map(c => c.split("="))
+  );
+  const token = cookies.access_token;
+  let userOrigin;
+  if (token) {
+    try {
+      const octokit = new Octokit({ auth: token });
+      const { data: me } = await octokit.request("GET /user");
+      userOrigin = `https://${me.login}.github.io`;
+    } catch {
+      // token 無効なら userOrigin は undefined のまま
     }
   }
 
-  // POST 以外 NG ------------------------------
+  // --- 2) プリフライトをユーザー OR テンプレどちらでも通す ---
+  if (req.method === "OPTIONS") {
+    if (origin === TEMPLATE_ORIGIN || origin === userOrigin) {
+      res.setHeader("Access-Control-Allow-Origin",      origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
+      return res.status(200).end();
+    }
+    return res.status(403).end();
+  }
+
+  // --- 3) POST 以外拒否 ---
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
-  // 1) 認証トークン取得
-  const cookies = Object.fromEntries(
-    (req.headers.cookie || "")
-      .split("; ")
-      .map((c) => c.split("="))
-  );
-  const token = cookies.access_token;
+  // --- 4) 改めて認証＆ Origin チェック（POST 本体） ---
   if (!token) {
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
-
-  // 2) GitHub API でログインユーザー名を取得
-  const octokit = new Octokit({ auth: token });
-  let me;
-  try {
-    ({ data: me } = await octokit.request("GET /user"));
-  } catch {
-    return res.status(401).json({ ok: false, error: "Invalid token" });
-  }
-  const userOrigin = `https://${me.login}.github.io`;
-
-  // 3) オリジンチェック
-  if (origin !== userOrigin && origin !== TEMPLATE_ORIGIN) {
+  if (origin !== TEMPLATE_ORIGIN && origin !== userOrigin) {
     return res.status(403).json({ ok: false, error: "Origin not allowed" });
   }
 
-  // 4) CORS ヘッダセット
-  res.setHeader("Access-Control-Allow-Origin", origin);
+  // --- 5) CORS ヘッダセット ＋ 並び替えロジック ---
+  res.setHeader("Access-Control-Allow-Origin",      origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
 
   // --- 並び替えロジック本体 -------------------
   try {
