@@ -120,7 +120,7 @@ export default async function handler(req, res) {
     }
     
     console.log("Getting repository content...");
-    console.log(`Trying to access: ${owner}/${repo}/public/index.html`);
+    console.log(`Trying to access: ${owner}/${repo}/index.html`);
     
     // まずリポジトリの存在確認
     try {
@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     // ファイル取得
     const { data: idx } = await octokit.request(
       "GET /repos/{owner}/{repo}/contents/{+path}",
-      { owner, repo, path: "public/index.html" }
+      { owner, repo, path: "index.html" }
     );
     const sha = idx.sha;
     let html = Buffer.from(idx.content, "base64").toString("utf8");
@@ -182,7 +182,7 @@ export default async function handler(req, res) {
       {
         owner,
         repo,
-        path: "public/index.html",
+        path: "index.html",
         message: "Reorder logs via drag-and-drop",
         content: Buffer.from(html, "utf8").toString("base64"),
         sha,
