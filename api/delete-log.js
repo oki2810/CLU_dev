@@ -4,6 +4,8 @@ import Cors from 'micro-cors';
 const cors = Cors({
   origin: 'https://yoshikawa04.github.io',
   allowCredentials: true,
+  allowMethods: ['POST','OPTIONS'],
+  allowHeaders: ['Content-Type'],
 });
 
 export default cors(async (req, res) => {
