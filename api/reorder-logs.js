@@ -80,7 +80,7 @@ export default cors(async (req, res) => {
     await octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
-      path: "index.html",
+      path: "public/index.html",
       message: "Reorder logs via drag-and-drop",
       content: Buffer.from(html, "utf8").toString("base64"),
       sha,
