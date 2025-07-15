@@ -286,7 +286,6 @@ document.addEventListener("DOMContentLoaded", () => {
           githubStatus.innerHTML =
             '<div class="alert alert-danger">通信エラーが発生しました</div>';
         }
-      });  // ← ここまでで addEventListener のコールバック全体が閉じています
 
         // --- HTML 整形 ---
         formatBtn.addEventListener("click", () => {
