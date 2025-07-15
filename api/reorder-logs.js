@@ -171,8 +171,8 @@ export default async function handler(req, res) {
 
     // <ul id="log-list"> を差し替え
     html = html.replace(
-      /<ul[^>]*id=["']log-list["'][^>]*>[\s\S]*?<\/ul>/,
-      (m) => m.replace(/>[\s\S]*?(?=<\/ul>)/, `>\n${newInner}\n`)
+      /(<h2[^>]*>ログ一覧<\/h2>\s*<ul[^>]*id=["']log-list["'][^>]*>)[\s\S]*?(<\/ul>)/,
+      (_, openTag, closeTag) => `${openTag}\n${newInner}\n${closeTag}`
     );
 
     console.log("Committing updated content...");
