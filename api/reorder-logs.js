@@ -4,70 +4,75 @@ export default async function handler(req, res) {
   const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN || "https://oki2810.github.io";
   const origin = req.headers.origin;
 
-  // --- 1) トークン取得（OPTIONS でも認証付きプリフライトを通すため） ---
-  const cookies = Object.fromEntries(
-    (req.headers.cookie || "").split("; ").map(c => c.split("="))
-  );
-  const token = cookies.access_token;
-  let userOrigin;
-  let octokit;
-  if (token) {
+  // --- 共通の認証処理関数 ---
+  const getAuthenticatedUser = async () => {
+    const cookies = Object.fromEntries(
+      (req.headers.cookie || "").split("; ").map(c => c.split("="))
+    );
+    const token = cookies.access_token;
+    
+    if (!token) return null;
+    
     try {
-      octokit = new Octokit({ auth: token });
+      const octokit = new Octokit({ auth: token });
       const { data: me } = await octokit.request("GET /user");
-      userOrigin = `https://${me.login}.github.io`;
+      return { octokit, userOrigin: `https://${me.login}.github.io` };
     } catch {
-      // token 無効なら userOrigin は undefined のまま
+      return null;
     }
-  }
+  };
 
-  // --- 2) プリフライトをユーザー OR テンプレどちらでも通す ---
+  // --- Origin許可チェック関数 ---
+  const isOriginAllowed = (origin, userOrigin) => {
+    if (!origin || !origin.endsWith('.github.io')) return false;
+    return origin === TEMPLATE_ORIGIN || origin === userOrigin;
+  };
+
+  // --- CORS ヘッダー設定 ---
+  const setCorsHeaders = (res, origin) => {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  };
+
+  // --- OPTIONS (プリフライト) リクエスト処理 ---
   if (req.method === "OPTIONS") {
-    if (origin && origin.endsWith('.github.io')) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
+    // 認証情報を取得
+    const authResult = await getAuthenticatedUser();
+    const userOrigin = authResult?.userOrigin;
+    
+    // Origin許可チェック
+    if (isOriginAllowed(origin, userOrigin)) {
+      setCorsHeaders(res, origin);
       return res.status(200).end();
     }
+    
     return res.status(403).end();
   }
 
-// POSTリクエスト時は認証をチェック
-if (req.method !== "POST") {
-  return res.status(405).json({ ok: false, error: "Method Not Allowed" });
-}
+  // --- POST リクエスト処理 ---
+  if (req.method !== "POST") {
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+  }
 
-// 認証とOriginチェック（POSTリクエスト時）
-const cookies = Object.fromEntries(
-  (req.headers.cookie || "").split("; ").map(c => c.split("="))
-);
-const token = cookies.access_token;
-if (!token) {
-  return res.status(401).json({ ok: false, error: "Unauthorized" });
-}
+  // 認証チェック
+  const authResult = await getAuthenticatedUser();
+  if (!authResult) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
 
-// POSTリクエストでは認証した後にOriginチェック
-let userOrigin;
-try {
-  const octokit = new Octokit({ auth: token });
-  const { data: me } = await octokit.request("GET /user");
-  userOrigin = `https://${me.login}.github.io`;
-} catch {
-  return res.status(401).json({ ok: false, error: "Unauthorized" });
-}
+  const { octokit, userOrigin } = authResult;
 
-if (origin !== TEMPLATE_ORIGIN && origin !== userOrigin) {
-  return res.status(403).json({ ok: false, error: "Origin not allowed" });
-}
+  // Origin許可チェック
+  if (!isOriginAllowed(origin, userOrigin)) {
+    return res.status(403).json({ ok: false, error: "Origin not allowed" });
+  }
 
-// 認証済み、かつOriginが許可されたらCORSヘッダをセット
-res.setHeader("Access-Control-Allow-Origin", origin);
-res.setHeader("Access-Control-Allow-Credentials", "true");
-res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // CORSヘッダーを設定
+  setCorsHeaders(res, origin);
 
-  // --- 並び替えロジック本体 -------------------
+  // --- 並び替えロジック本体 ---
   try {
     const { owner, repo, order } = req.body;
     if (!owner || !repo || !Array.isArray(order)) {
