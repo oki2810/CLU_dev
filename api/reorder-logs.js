@@ -1,80 +1,75 @@
 import { Octokit } from "@octokit/rest";
 
 export default async function handler(req, res) {
-  // Vercel の環境変数から取得
-  const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN;
+  const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN; // "https://oki2810.github.io"
+  const origin = req.headers.origin;
 
-  async function setDynamicCors() {
-    const origin = req.headers.origin;
-    // 認証トークン取得
-    const cookies = Object.fromEntries(
-      (req.headers.cookie || "")
-        .split("; ")
-        .map((c) => c.split("="))
-    );
-    const token = cookies.access_token;
-    if (!token) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
-      return false;
-    }
-    // GitHub API でログインユーザー名を取得
-    const octokit = new Octokit({ auth: token });
-    const { data: me } = await octokit.request("GET /user");
-    const userOrigin = `https://${me.login}.github.io`;
-
-    // テンプレート or ユーザーページどちらかを許可
-    if (origin !== userOrigin && origin !== TEMPLATE_ORIGIN) {
-      res.status(403).json({ ok: false, error: "Origin not allowed" });
-      return false;
-    }
-
-    // CORS ヘッダをセット
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return true;
-  }
-
-  // --- OPTIONS (プリフライト) ---
+  // プリフライト（認証不要）-------------------
   if (req.method === "OPTIONS") {
-    const ok = await setDynamicCors();
-    if (ok) return res.status(200).end();
-    return; // setDynamicCors 内でレスポンス済み
+    if (origin === TEMPLATE_ORIGIN) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      return res.status(200).end();
+    } else {
+      return res.status(403).end();
+    }
   }
 
-  // --- POST 以外拒否 ---
+  // POST 以外 NG ------------------------------
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
-  // --- CORS チェック & ヘッダセット ---
-  if (!(await setDynamicCors())) return;
+  // 1) 認証トークン取得
+  const cookies = Object.fromEntries(
+    (req.headers.cookie || "")
+      .split("; ")
+      .map((c) => c.split("="))
+  );
+  const token = cookies.access_token;
+  if (!token) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
 
-  // --- 実際の並び替えロジック ---
+  // 2) GitHub API でログインユーザー名を取得
+  const octokit = new Octokit({ auth: token });
+  let me;
+  try {
+    ({ data: me } = await octokit.request("GET /user"));
+  } catch {
+    return res.status(401).json({ ok: false, error: "Invalid token" });
+  }
+  const userOrigin = `https://${me.login}.github.io`;
+
+  // 3) オリジンチェック
+  if (origin !== userOrigin && origin !== TEMPLATE_ORIGIN) {
+    return res.status(403).json({ ok: false, error: "Origin not allowed" });
+  }
+
+  // 4) CORS ヘッダセット
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // --- 並び替えロジック本体 -------------------
   try {
     const { owner, repo, order } = req.body;
     if (!owner || !repo || !Array.isArray(order)) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Missing parameters" });
+      return res.status(400).json({ ok: false, error: "Missing parameters" });
     }
 
-    const octokit2 = new Octokit({ auth: cookies.access_token });
-
-    // 1) public/index.html を取得
-    const { data: idx } = await octokit2.request(
+    // ファイル取得
+    const { data: idx } = await octokit.request(
       "GET /repos/{owner}/{repo}/contents/{+path}",
-      {
-        owner,
-        repo,
-        path: "public/index.html",
-      }
+      { owner, repo, path: "public/index.html" }
     );
     const sha = idx.sha;
     let html = Buffer.from(idx.content, "base64").toString("utf8");
 
-    // 2) <li> ブロックを抽出してマップ化
+    // <li> をマップ化
     const liMatches = Array.from(html.matchAll(/<li[\s\S]*?<\/li>/g));
     const liMap = {};
     liMatches.forEach((m) => {
@@ -83,17 +78,17 @@ export default async function handler(req, res) {
       if (dm) liMap[dm[1]] = block;
     });
 
-    // 3) 新しい順序で innerHTML を組み立て
+    // 新 innerHTML 組み立て
     const newInner = order.map((p) => liMap[p] || "").join("\n");
 
-    // 4) <ul id="log-list"> 部分を差し替え
+    // <ul id="log-list"> を差し替え
     html = html.replace(
       /<ul[^>]*id=["']log-list["'][^>]*>[\s\S]*?<\/ul>/,
       (m) => m.replace(/>[\s\S]*?(?=<\/ul>)/, `>\n${newInner}\n`)
     );
 
-    // 5) 再コミット
-    await octokit2.request(
+    // 再コミット
+    await octokit.request(
       "PUT /repos/{owner}/{repo}/contents/{+path}",
       {
         owner,
@@ -108,8 +103,6 @@ export default async function handler(req, res) {
     return res.json({ ok: true });
   } catch (err) {
     console.error("Reorder API error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: err.message || "Unknown error" });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 }
