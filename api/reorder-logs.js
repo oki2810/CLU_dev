@@ -10,9 +10,10 @@ export default async function handler(req, res) {
   );
   const token = cookies.access_token;
   let userOrigin;
+  let octokit;
   if (token) {
     try {
-      const octokit = new Octokit({ auth: token });
+      octokit = new Octokit({ auth: token });
       const { data: me } = await octokit.request("GET /user");
       userOrigin = `https://${me.login}.github.io`;
     } catch {
