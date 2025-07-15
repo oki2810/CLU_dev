@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   // --- 2) プリフライトをユーザー OR テンプレどちらでも通す ---
   if (req.method === "OPTIONS") {
     if (origin === TEMPLATE_ORIGIN || origin === userOrigin) {
-      res.setHeader("Access-Control-Allow-Origin",      origin);
+      res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Access-Control-Allow-Methods",     "POST,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers",     "Content-Type");
