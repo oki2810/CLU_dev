@@ -48,6 +48,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- タブ切り替え ---
+    tabUsage.addEventListener("click", () => {
+        console.log("使い方タブがクリックされました");
+        activateTab("usage");
+    });
+    tabFeature.addEventListener("click", () => {
+        console.log("特徴タブがクリックされました");
+          activateTab("feature");
+    });
+    
     function activateTab(target) {
         if (!tabCCU || !tabUsage || !tabFeature || !ccuContent || !usageContent ||
             !featureContent) return;
