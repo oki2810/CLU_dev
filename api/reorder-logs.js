@@ -1,34 +1,32 @@
+// pages/api/reorder-logs.js
+
 import { Octokit } from "@octokit/rest";
+
+export const config = {
+  api: { bodyParser: true },
+  runtime: "nodejs",
+};
 
 export default async function handler(req, res) {
   const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN || "https://oki2810.github.io";
   const origin = req.headers.origin;
-  
+
   console.log(`[${new Date().toISOString()}] ${req.method} request from origin: ${origin}`);
   console.log(`TEMPLATE_ORIGIN: ${TEMPLATE_ORIGIN}`);
 
   // --- 共通の認証処理関数 ---
   const getAuthenticatedUser = async () => {
     console.log("Raw cookie header:", req.headers.cookie);
-    
     const cookies = Object.fromEntries(
       (req.headers.cookie || "").split("; ").map(c => c.split("="))
     );
-    
     console.log("Parsed cookies:", Object.keys(cookies));
-    
     const token = cookies.access_token;
-    
     console.log(`Token exists: ${!!token}`);
-    if (token) {
-      console.log(`Token preview: ${token.substring(0, 10)}...`);
-    }
-    
     if (!token) {
       console.log("No access token found");
       return null;
     }
-    
     try {
       const octokit = new Octokit({ auth: token });
       const { data: me } = await octokit.request("GET /user");
@@ -46,15 +44,13 @@ export default async function handler(req, res) {
     console.log(`Checking origin: ${origin}`);
     console.log(`Against TEMPLATE_ORIGIN: ${TEMPLATE_ORIGIN}`);
     console.log(`Against userOrigin: ${userOrigin}`);
-    
-    if (!origin || !origin.endsWith('.github.io')) {
+    if (!origin || !origin.endsWith(".github.io")) {
       console.log("Origin rejected: not a github.io domain");
       return false;
     }
-    
-    const isAllowed = origin === TEMPLATE_ORIGIN || origin === userOrigin;
-    console.log(`Origin allowed: ${isAllowed}`);
-    return isAllowed;
+    const allowed = origin === TEMPLATE_ORIGIN || origin === userOrigin;
+    console.log(`Origin allowed: ${allowed}`);
+    return allowed;
   };
 
   // --- CORS ヘッダー設定 ---
@@ -69,14 +65,11 @@ export default async function handler(req, res) {
   // --- OPTIONS (プリフライト) リクエスト処理 ---
   if (req.method === "OPTIONS") {
     console.log("Processing OPTIONS request");
-    
-    // プリフライトでは認証をスキップし、github.ioドメインのみチェック
-    if (origin && origin.endsWith('.github.io')) {
+    if (origin && origin.endsWith(".github.io")) {
       console.log("OPTIONS request approved - github.io domain detected");
       setCorsHeaders(res, origin);
       return res.status(200).end();
     }
-    
     console.log("OPTIONS request rejected - not a github.io domain");
     return res.status(403).end();
   }
@@ -95,16 +88,13 @@ export default async function handler(req, res) {
     console.log("POST request unauthorized");
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
-
-  const { octokit, userOrigin, username } = authResult;
+  const { octokit, userOrigin } = authResult;
 
   // Origin許可チェック
   if (!isOriginAllowed(origin, userOrigin)) {
     console.log("POST request origin not allowed");
     return res.status(403).json({ ok: false, error: "Origin not allowed" });
   }
-
-  console.log("POST request approved - proceeding with reorder logic");
 
   // CORSヘッダーを設定
   setCorsHeaders(res, origin);
@@ -113,70 +103,68 @@ export default async function handler(req, res) {
   try {
     const { owner, repo, order } = req.body;
     console.log(`Request body: owner=${owner}, repo=${repo}, order length=${order?.length}`);
-    
     if (!owner || !repo || !Array.isArray(order)) {
       console.log("Missing or invalid parameters");
       return res.status(400).json({ ok: false, error: "Missing parameters" });
     }
-    
-    console.log("Getting repository content...");
-    console.log(`Trying to access: ${owner}/${repo}/index.html`);
-    
-    // まずリポジトリの存在確認
+
+    // リポジトリ存在確認
     try {
-      const { data: repoInfo } = await octokit.request("GET /repos/{owner}/{repo}", {
-        owner,
-        repo
-      });
+      const { data: repoInfo } = await octokit.request("GET /repos/{owner}/{repo}", { owner, repo });
       console.log(`Repository found: ${repoInfo.full_name}`);
     } catch (repoErr) {
       console.log("Repository not found or not accessible:", repoErr.message);
       return res.status(404).json({ ok: false, error: "Repository not found or not accessible" });
     }
 
-    // ファイル取得
-    const { data: idx } = await octokit.request(
-      "GET /repos/{owner}/{repo}/contents/{+path}",
-      { owner, repo, path: "index.html" }
-    );
-    const sha = idx.sha;
-    let html = Buffer.from(idx.content, "base64").toString("utf8");
+    // 1) index.html を取得。404 ならクライアントエラー返却
+    let idxData, sha, html;
+    try {
+      const resp = await octokit.request(
+        "GET /repos/{owner}/{repo}/contents/{+path}",
+        { owner, repo, path: "index.html" }
+      );
+      idxData = resp.data;
+      sha = idxData.sha;
+      html = Buffer.from(idxData.content, "base64").toString("utf8");
+      console.log("Fetched index.html length:", html.length);
+    } catch (err) {
+      if (err.status === 404) {
+        console.log("index.html not found");
+        return res
+          .status(400)
+          .json({ ok: false, error: "index.html が存在しません。まず初期設定を行ってください。" });
+      }
+      throw err;
+    }
 
-    console.log("Processing HTML content...");
-    console.log(`HTML content length: ${html.length} characters`);
-    
-    // <li> をマップ化
+    // 2) <li> をマップ化
     const liMatches = Array.from(html.matchAll(/<li[\s\S]*?<\/li>/g));
-    console.log(`Found ${liMatches.length} li elements`);
-    
+    console.log(`Found ${liMatches.length} <li> elements`);
     const liMap = {};
-    liMatches.forEach((m, index) => {
+    liMatches.forEach((m, i) => {
       const block = m[0];
       const dm = block.match(/data-path="([^"]+)"/);
       if (dm) {
         liMap[dm[1]] = block;
-        console.log(`Li ${index}: data-path="${dm[1]}"`);
       } else {
-        console.log(`Li ${index}: no data-path attribute`);
-        // data-path属性がない場合の詳細ログ
-        console.log(`Li ${index} content preview: ${block.substring(0, 100)}...`);
+        console.log(`Li ${i} missing data-path: preview ${block.slice(0, 50)}...`);
       }
     });
 
-    console.log(`Mapped ${Object.keys(liMap).length} li elements with data-path`);
-    console.log(`Available data-path values:`, Object.keys(liMap));
+    // 3) 新 innerHTML 組み立て
+    const newInner = order.map(path => liMap[path] || "").join("\n");
 
-    // 新 innerHTML 組み立て
-    const newInner = order.map((p) => liMap[p] || "").join("\n");
-
-    // <ul id="log-list"> を差し替え
+    // 4) <ul id="log-list"> を置き換え
     html = html.replace(
-      /(<h2[^>]*>ログ一覧<\/h2>\s*<ul[^>]*id=["']log-list["'][^>]*>)[\s\S]*?(<\/ul>)/,
-      (_, openTag, closeTag) => `${openTag}\n${newInner}\n${closeTag}`
+      /(<h2[^>]*>ログ一覧<\/h2>\s*<ul[^>]*id=["']log-list["'][^>]*>)([\s\S]*?)(<\/ul>)/i,
+      (_, openTag, oldInner, closeTag) => {
+        console.log("Replacing <ul> contents:", { oldInnerLength: oldInner.length });
+        return `${openTag}\n${newInner}\n${closeTag}`;
+      }
     );
 
-    console.log("Committing updated content...");
-    // 再コミット
+    // 5) 更新をコミット
     await octokit.request(
       "PUT /repos/{owner}/{repo}/contents/{+path}",
       {
