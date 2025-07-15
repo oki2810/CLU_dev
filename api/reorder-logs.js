@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       const { data: me } = await octokit.request("GET /user");
       const userOrigin = `https://${me.login}.github.io`;
       console.log(`Authenticated user: ${me.login}, userOrigin: ${userOrigin}`);
-      return { octokit, userOrigin };
+      return { octokit, userOrigin, username: me.login };
     } catch (error) {
       console.log("Authentication failed:", error.message);
       return null;
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
 
-  const { octokit, userOrigin } = authResult;
+  const { octokit, userOrigin, username } = authResult;
 
   // Origin許可チェック
   if (!isOriginAllowed(origin, userOrigin)) {
@@ -119,6 +119,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing parameters" });
     }
 
+    // 認証済みユーザーが指定したリポジトリにアクセス権限があるかチェック
+    // (ownerは認証済みユーザー自身である必要がある)
+    if (owner !== username) {
+      console.log(`Access denied: ${username} trying to access ${owner}/${repo}`);
+      return res.status(403).json({ ok: false, error: "Access denied" });
+    }
+    
     console.log("Getting repository content...");
     console.log(`Trying to access: ${owner}/${repo}/public/index.html`);
     
