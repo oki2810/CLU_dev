@@ -28,12 +28,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const githubStatus = document.getElementById("githubStatus");
 
     // タブ切り替え要素
-    const tabCCU = document.getElementById("tabCCU");
-    const tabUsage = document.getElementById("tabUsage");
-    const tabFeature = document.getElementById("tabFeature");
-    const ccuContent = document.getElementById("ccuContent");
-    const usageContent = document.getElementById("usageContent");
-    const featureContent = document.getElementById("featureContent");
+    const tabs = {
+        tabCCU: "ccuContent",
+        tabUsage: "usageContent",
+        tabFeature: "featureContent"
+    };
 
     let ownerName = "";
 
@@ -48,45 +47,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- タブ切り替え ---
-    tabUsage.addEventListener("click", () => {
-        console.log("使い方タブがクリックされました");
-        activateTab("usage");
+    Object.values(tabs).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
     });
-    tabFeature.addEventListener("click", () => {
-        console.log("特徴タブがクリックされました");
-          activateTab("feature");
-    });
-    
-    function activateTab(target) {
-        if (!tabCCU || !tabUsage || !tabFeature || !ccuContent || !usageContent ||
-            !featureContent) return;
-        tabCCU.classList.remove("active");
-        tabUsage.classList.remove("active");
-        tabFeature.classList.remove("active");
-        ccuContent.style.display = "none";
-        usageContent.style.display = "none";
-        featureContent.style.display = "none";
-        switch (target) {
-            case "usage":
-                tabUsage.classList.add("active");
-                usageContent.style.display = "block";
-                break;
-            case "feature":
-                tabFeature.classList.add("active");
-                featureContent.style.display = "block";
-                break;
-            default:
-                tabCCU.classList.add("active");
-                ccuContent.style.display = "block";
-        }
-    }
 
-    if (tabCCU && tabUsage && tabFeature) {
-        tabCCU.addEventListener("click", () => activateTab("ccu"));
-        tabUsage.addEventListener("click", () => activateTab("usage"));
-        tabFeature.addEventListener("click", () => activateTab("feature"));
-        activateTab("ccu");
-    }
+    document.getElementById("ccuContent").style.display = "block";
+
+    Object.entries(tabs).forEach(([tabId, contentId]) => {
+        const tab = document.getElementById(tabId);
+        const content = document.getElementById(contentId);
+        if (!tab || !content) return;
+        tab.addEventListener("click", () => {
+            // タブ見た目更新
+            Object.keys(tabs).forEach(id => {
+                document.getElementById(id).classList.remove("active");
+            });
+            tab.classList.add("active");
+            // コンテンツ表示切替
+            Object.values(tabs).forEach(id => {
+                document.getElementById(id).style.display = "none";
+            });
+            content.style.display = "block";
+        });
+    });
 
     // --- GitHub OAuth 開始・解除 ---
     githubConnectBtn.addEventListener("click", () => {
