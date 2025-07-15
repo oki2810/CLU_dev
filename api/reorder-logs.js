@@ -9,9 +9,14 @@ export default async function handler(req, res) {
 
   // --- 共通の認証処理関数 ---
   const getAuthenticatedUser = async () => {
+    console.log("Raw cookie header:", req.headers.cookie);
+    
     const cookies = Object.fromEntries(
       (req.headers.cookie || "").split("; ").map(c => c.split("="))
     );
+    
+    console.log("Parsed cookies:", Object.keys(cookies));
+    
     const token = cookies.access_token;
     
     console.log(`Token exists: ${!!token}`);
@@ -115,6 +120,20 @@ export default async function handler(req, res) {
     }
 
     console.log("Getting repository content...");
+    console.log(`Trying to access: ${owner}/${repo}/public/index.html`);
+    
+    // まずリポジトリの存在確認
+    try {
+      const { data: repoInfo } = await octokit.request("GET /repos/{owner}/{repo}", {
+        owner,
+        repo
+      });
+      console.log(`Repository found: ${repoInfo.full_name}`);
+    } catch (repoErr) {
+      console.log("Repository not found or not accessible:", repoErr.message);
+      return res.status(404).json({ ok: false, error: "Repository not found or not accessible" });
+    }
+
     // ファイル取得
     const { data: idx } = await octokit.request(
       "GET /repos/{owner}/{repo}/contents/{+path}",
@@ -124,16 +143,28 @@ export default async function handler(req, res) {
     let html = Buffer.from(idx.content, "base64").toString("utf8");
 
     console.log("Processing HTML content...");
+    console.log(`HTML content length: ${html.length} characters`);
+    
     // <li> をマップ化
     const liMatches = Array.from(html.matchAll(/<li[\s\S]*?<\/li>/g));
+    console.log(`Found ${liMatches.length} li elements`);
+    
     const liMap = {};
-    liMatches.forEach((m) => {
+    liMatches.forEach((m, index) => {
       const block = m[0];
       const dm = block.match(/data-path="([^"]+)"/);
-      if (dm) liMap[dm[1]] = block;
+      if (dm) {
+        liMap[dm[1]] = block;
+        console.log(`Li ${index}: data-path="${dm[1]}"`);
+      } else {
+        console.log(`Li ${index}: no data-path attribute`);
+        // data-path属性がない場合の詳細ログ
+        console.log(`Li ${index} content preview: ${block.substring(0, 100)}...`);
+      }
     });
 
-    console.log(`Found ${liMatches.length} li elements, mapped ${Object.keys(liMap).length} with data-path`);
+    console.log(`Mapped ${Object.keys(liMap).length} li elements with data-path`);
+    console.log(`Available data-path values:`, Object.keys(liMap));
 
     // 新 innerHTML 組み立て
     const newInner = order.map((p) => liMap[p] || "").join("\n");
