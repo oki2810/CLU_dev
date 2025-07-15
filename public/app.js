@@ -306,3 +306,4 @@ document.addEventListener("DOMContentLoaded", () => {
           reader.readAsText(uploadHtml.files[0]);
         });
       });
+});
