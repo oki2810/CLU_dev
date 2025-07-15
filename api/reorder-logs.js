@@ -46,7 +46,7 @@ export default cors(async (req, res) => {
     const idx = await octokit.repos.getContent({
       owner,
       repo,
-      path: "index.html",
+      path: "public/index.html",
     });
     const sha = idx.data.sha;
     let html = Buffer.from(idx.data.content, "base64").toString("utf8");
