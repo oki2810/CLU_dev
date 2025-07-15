@@ -5,7 +5,6 @@ import path from "path";
 // IncomingForm を直接インポート
 import { IncomingForm } from "formidable";
 import { Octokit } from "@octokit/rest";
-
 export const config = {
   api: { bodyParser: false },
   runtime: 'nodejs',
@@ -148,15 +147,19 @@ export default async function handler(req, res) {
 `.trim();
 
     // 5) <ul id="log-list"> の中に差し込む
-    if (html.match(/<ul[^>]+id=["']log-list["'][^>]*>/)) {
+    const hasLogList = /<ul[\s\S]*?\bid=["']log-list["'][\s\S]*?>/i.test(html);
+    if (!hasLogList) {
+      console.log('テンプレート内に log-list が見つからなかったため、デフォルト UL を挿入します');
       html = html.replace(
-        /(<ul[^>]+id=["']log-list["'][^>]*>)/,
-        `$1\n${newItem}`
+        /(<h2[^>]*>ログ一覧<\/h2>)/i,
+        `$1\n<ul id="log-list" class="list-group"></ul>`
       );
     } else {
+      console.log('テンプレート内に log-list を検出。デフォルト挿入スキップ');
+      // 5-a) 既存の UL があるなら <li> を差し込む
       html = html.replace(
-        /<\/body>/i,
-        `<ul id="log-list" class="list-group">\n${newItem}\n</ul>\n</body>`
+        /(<ul[^>]+id=["']log-list["'][^>]*>)[\s\S]*?(<\/ul>)/i,
+        (_, open, close) => `${open}\n  ${newItem}\n${close}`
       );
     }
 
