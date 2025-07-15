@@ -1,7 +1,13 @@
 import { Octokit } from "@octokit/rest";
 
 export default async function handler(req, res) {
-  const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN; // "https://oki2810.github.io"
+  console.log(
+    "🌟 TEMPLATE_ORIGIN:",
+    process.env.TEMPLATE_ORIGIN,
+    "– incoming Origin:",
+    req.headers.origin
+  );
+  const TEMPLATE_ORIGIN = process.env.TEMPLATE_ORIGIN || "https://oki2810.github.io";
   const origin = req.headers.origin;
 
   // プリフライト（認証不要）-------------------
