@@ -136,7 +136,6 @@ export default async function handler(req, res) {
     data-path="${filePath}"
 >
   <span>
-    <span class="text-muted">${scenarioName}</span><br>
     <a href="${filePath}" class="ms-2">${linkText}</a>
   </span>
   <button type="button" class="btn btn-sm btn-danger btn-delete">削除</button>
