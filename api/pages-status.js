@@ -85,7 +85,7 @@ export default async function handler(req, res) {
   }
 
   // 5) ボディ検証
-  const { owner, repo } = req.body;
+  const { owner, repo, commit } = req.body;
   if (typeof owner !== "string" || typeof repo !== "string") {
     return res.status(400).json({ ok: false, error: "owner and repo required" });
   }
@@ -101,7 +101,8 @@ export default async function handler(req, res) {
       owner,
       repo,
     });
-    return res.status(200).json({ ok: true, status: data.status });
+    const done = commit ? data.commit === commit && data.status === "built" : data.status === "built";
+    return res.status(200).json({ ok: true, status: data.status, commit: data.commit, done });
   } catch (err) {
     console.error("pages-status error:", err);
     return res.status(500).json({ ok: false, error: err.message });

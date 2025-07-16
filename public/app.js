@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // GitHub Pages ビルド完了待ち
-    async function waitForBuildCompletion(owner, repo) {
+    async function waitForBuildCompletion(owner, repo, commit) {
         while (true) {
             try {
                 const res = await fetch("/api/pages-status", {
@@ -148,10 +148,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         "Content-Type": "application/json",
                         "X-CSRF-Token": getCsrfToken(),
                     },
-                    body: JSON.stringify({ owner, repo }),
+                    body: JSON.stringify({ owner, repo, commit }),
                 });
                 const data = await res.json();
-                if (data.ok && data.status === "built") {
+                if (data.ok && data.done) {
                     return;
                 }
             } catch (err) {
@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 6) 成功したのでページビルドを待つ
             githubStatus.textContent = "デプロイ中…";
-            await waitForBuildCompletion(ownerName, repo);
+            await waitForBuildCompletion(ownerName, repo, result.commit);
             githubStatus.innerHTML =
                 '<div class="alert alert-success">GitHubへのコミットに成功しました！</div>';
         } catch (err) {

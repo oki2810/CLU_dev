@@ -213,7 +213,8 @@ export default async function handler(req, res) {
       sha: newCommitSha,
     });
 
-    return res.status(200).json({ ok: true });
+    // 返却値にコミット SHA を含める
+    return res.status(200).json({ ok: true, commit: newCommitSha });
   } catch (error) {
     console.error("apply-changes error:", error);
     return res.status(500).json({ ok: false, error: error.message });
