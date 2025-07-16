@@ -37,9 +37,16 @@ export default async function handler(req, res) {
   }
 
   // --- Origin 許可チェック ---
+  const APP_ORIGIN = process.env.APP_ORIGIN || 'https://ccfolialoguploader.com';
+
   function isOriginAllowed(origin, userOrigin) {
-    const allowed = !!origin && origin.endsWith('.github.io') &&
-      (origin === TEMPLATE_ORIGIN || origin === userOrigin);
+    const allowed =
+      typeof origin === 'string' &&
+      (
+        origin === APP_ORIGIN ||
+        (origin.endsWith('.github.io') &&
+          (origin === TEMPLATE_ORIGIN || origin === userOrigin))
+      );
     console.log('[apply-changes] Origin check', { origin, userOrigin, allowed });
     return allowed;
   }
@@ -206,7 +213,8 @@ export default async function handler(req, res) {
       sha: newCommitSha,
     });
 
-    return res.status(200).json({ ok: true });
+    // 返却値にコミット SHA を含める
+    return res.status(200).json({ ok: true, commit: newCommitSha });
   } catch (error) {
     console.error("apply-changes error:", error);
     return res.status(500).json({ ok: false, error: error.message });

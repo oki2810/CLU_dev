@@ -253,8 +253,8 @@ export default async function handler(req, res) {
       sha: newCommit.sha,
     });
 
-    // 成功レスポンス
-    return res.json({ ok: true });
+    // 成功レスポンスにコミット SHA を含める
+    return res.json({ ok: true, commit: newCommit.sha });
   } catch (err) {
     console.error("Upload API error:", err);
     return res
