@@ -37,9 +37,16 @@ export default async function handler(req, res) {
   }
 
   // --- Origin 許可チェック ---
+  const APP_ORIGIN = process.env.APP_ORIGIN || 'https://ccfolialoguploader.com';
+
   function isOriginAllowed(origin, userOrigin) {
-    const allowed = !!origin && origin.endsWith('.github.io') &&
-      (origin === TEMPLATE_ORIGIN || origin === userOrigin);
+    const allowed =
+      typeof origin === 'string' &&
+      (
+        origin === APP_ORIGIN ||
+        (origin.endsWith('.github.io') &&
+          (origin === TEMPLATE_ORIGIN || origin === userOrigin))
+      );
     console.log('[apply-changes] Origin check', { origin, userOrigin, allowed });
     return allowed;
   }
