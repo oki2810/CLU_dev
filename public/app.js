@@ -318,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // 6) 成功したのでページビルドを待つ
-            githubStatus.textContent = "デプロイ中…";
+            githubStatus.textContent = "デプロイ中…(2~3分かかります)";
             await waitForBuildCompletion(ownerName, repo, result.commit);
             githubStatus.innerHTML =
                 '<div class="alert alert-success">GitHubへのコミットに成功しました！</div>';
