@@ -136,6 +136,30 @@ document.addEventListener("DOMContentLoaded", () => {
         viewProjectBtn.style.display = "inline-block";
         viewRepoBtn.style.display = "inline-block";
     }
+
+    // GitHub Pages ビルド完了待ち
+    async function waitForBuildCompletion(owner, repo) {
+        while (true) {
+            try {
+                const res = await fetch("/api/pages-status", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": getCsrfToken(),
+                    },
+                    body: JSON.stringify({ owner, repo }),
+                });
+                const data = await res.json();
+                if (data.ok && data.status === "built") {
+                    return;
+                }
+            } catch (err) {
+                console.error("pages-status fetch error:", err);
+            }
+            await new Promise((r) => setTimeout(r, 5000));
+        }
+    }
     repoInput.addEventListener("input", updateViewBtn);
     updateViewBtn();
 
@@ -293,9 +317,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 6) 成功
+            // 6) 成功したのでページビルドを待つ
+            githubStatus.textContent = "デプロイ中…";
+            await waitForBuildCompletion(ownerName, repo);
             githubStatus.innerHTML =
-                `<div class="alert alert-success">GitHubへのコミットに成功しました！<br>反映まで2~3分お待ち下さい！</div>`;
+                '<div class="alert alert-success">GitHubへのコミットに成功しました！</div>';
         } catch (err) {
             console.error("通信中にエラー:", err);
             githubStatus.innerHTML =
