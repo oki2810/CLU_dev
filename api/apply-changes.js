@@ -46,7 +46,9 @@ export default async function handler(req, res) {
 
   // --- CORS ヘッダー設定 ---
   function setCorsHeaders(res, origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -84,7 +86,11 @@ export default async function handler(req, res) {
     console.log('[apply-changes] Forbidden: origin not allowed');
     return res.status(403).json({ ok: false, error: 'Origin not allowed' });
   }
-  setCorsHeaders(res, origin);
+  if (origin) {
+    setCorsHeaders(res, origin);
+  } else {
+    setCorsHeaders(res);
+  }
 
   // リクエストボディ検証
   const { owner, repo, order, deletes } = req.body;

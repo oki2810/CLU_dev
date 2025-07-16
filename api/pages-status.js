@@ -37,7 +37,9 @@ function isOriginAllowed(origin, userOrigin) {
 
 // どのレスポンスにも付与する CORS ヘッダー
 function setCorsHeaders(res, origin) {
-  res.setHeader("Access-Control-Allow-Origin", origin);
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -62,7 +64,11 @@ export default async function handler(req, res) {
   }
 
   // 共通: CORS ヘッダーをまず付与
-  setCorsHeaders(res, origin);
+  if (origin) {
+    setCorsHeaders(res, origin);
+  } else {
+    setCorsHeaders(res);
+  }
 
   // 3) 認証チェック
   const auth = await getAuthenticatedUser(req);
