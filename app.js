@@ -123,6 +123,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 repoSettings.style.display = "none";
                 ownerName = "";
             }
+
+            // 認証状態に関わらずボタン状態を更新
+            updateViewBtn();
         });
 
     // リポジトリ名入力必須チェック
