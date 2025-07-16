@@ -36,6 +36,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let ownerName = "";
 
+    // --- 最後に使用したリポジトリ保存用 Cookie ---
+    function getLastRepo() {
+        const m = document.cookie.match(/(?:^| )last_repo=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : "";
+    }
+    function setLastRepo(repo) {
+        document.cookie = `last_repo=${encodeURIComponent(repo)}; max-age=${60 * 60 * 24 * 30}; path=/`;
+    }
+
+    // ページ読み込み時に前回のリポジトリを入力欄へ反映
+    const savedRepo = getLastRepo();
+    if (savedRepo && repoInput) {
+        repoInput.value = savedRepo;
+    }
+
     // シナリオ名 → path 同期
     if (filenameInput && pathInput) {
         const syncPath = () => {
@@ -108,6 +123,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 repoSettings.style.display = "none";
                 ownerName = "";
             }
+
+            // 認証状態に関わらずボタン状態を更新
+            updateViewBtn();
         });
 
     // リポジトリ名入力必須チェック
@@ -160,7 +178,11 @@ document.addEventListener("DOMContentLoaded", () => {
             await new Promise((r) => setTimeout(r, 5000));
         }
     }
-    repoInput.addEventListener("input", updateViewBtn);
+    repoInput.addEventListener("input", () => {
+        updateViewBtn();
+        const v = repoInput.value.trim();
+        if (v) setLastRepo(v);
+    });
     updateViewBtn();
 
     // --- 既存リポジトリ利用チェック ---
