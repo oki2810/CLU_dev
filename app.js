@@ -280,7 +280,8 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             // 1) FormData 組み立て
             const formData = new FormData();
-            formData.append("htmlFile", uploadHtml.files[0]);
+            const fixedBlob = new Blob([formattedOutput.textContent], { type: "text/html" });
+            formData.append("htmlFile", fixedBlob, "log.html");
             formData.append("owner", ownerName);
             formData.append("repo", repo);
             formData.append("path", path);
