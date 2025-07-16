@@ -9,7 +9,7 @@ export const config = {
 // GitHub 認証済みユーザーを返す（失敗時は null）
 async function getAuthenticatedUser(req) {
   const cookies = Object.fromEntries(
-    (req.headers.cookie || "").split("; ").map(c => c.split("="))
+    (req.headers.cookie || "").split("; ").map((c) => c.split("="))
   );
   const token = cookies.access_token;
   if (!token) return null;
@@ -87,7 +87,9 @@ export default async function handler(req, res) {
   // 5) ボディ検証
   const { owner, repo, commit } = req.body;
   if (typeof owner !== "string" || typeof repo !== "string") {
-    return res.status(400).json({ ok: false, error: "owner and repo required" });
+    return res
+      .status(400)
+      .json({ ok: false, error: "owner and repo required" });
   }
 
   // 6) オーナー一致チェック
@@ -101,8 +103,12 @@ export default async function handler(req, res) {
       owner,
       repo,
     });
-    const done = commit ? data.commit === commit && data.status === "built" : data.status === "built";
-    return res.status(200).json({ ok: true, status: data.status, commit: data.commit, done });
+    const done = commit
+      ? data.commit === commit && data.status === "built"
+      : data.status === "built";
+    return res
+      .status(200)
+      .json({ ok: true, status: data.status, commit: data.commit, done });
   } catch (err) {
     console.error("pages-status error:", err);
     return res.status(500).json({ ok: false, error: err.message });

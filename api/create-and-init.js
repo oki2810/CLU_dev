@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   const cookies = Object.fromEntries(
-    (req.headers.cookie || "").split("; ").map(c => c.split("="))
+    (req.headers.cookie || "").split("; ").map((c) => c.split("="))
   );
   const token = cookies.access_token;
   if (!token) {
@@ -15,7 +15,9 @@ export default async function handler(req, res) {
 
   const { repo: name, description } = req.body || {};
   if (!name) {
-    return res.status(400).json({ ok: false, error: "Missing repository name" });
+    return res
+      .status(400)
+      .json({ ok: false, error: "Missing repository name" });
   }
 
   const octokit = new Octokit({ auth: token });
@@ -35,6 +37,8 @@ export default async function handler(req, res) {
     return res.json({ ok: true, default_branch: defaultBranch });
   } catch (err) {
     console.error("create-and-init error:", err);
-    return res.status(err.status || 500).json({ ok: false, error: err.message });
+    return res
+      .status(err.status || 500)
+      .json({ ok: false, error: err.message });
   }
 }

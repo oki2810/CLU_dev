@@ -7,7 +7,7 @@ import { IncomingForm } from "formidable";
 import { Octokit } from "@octokit/rest";
 export const config = {
   api: { bodyParser: false },
-  runtime: 'nodejs',
+  runtime: "nodejs",
 };
 
 const DEFAULT_INDEX = `<!DOCTYPE html>
@@ -32,23 +32,17 @@ const DEFAULT_INDEX = `<!DOCTYPE html>
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res
-      .status(405)
-      .json({ ok: false, error: "Method Not Allowed" });
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
   try {
     // --- 認証トークン取得 ---
     const cookies = Object.fromEntries(
-      (req.headers.cookie || "")
-        .split("; ")
-        .map((c) => c.split("="))
+      (req.headers.cookie || "").split("; ").map((c) => c.split("="))
     );
     const token = cookies.access_token;
     if (!token) {
-      return res
-        .status(401)
-        .json({ ok: false, error: "Unauthorized" });
+      return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
 
     // --- multipart/form-data を formidable でパース ---
@@ -63,22 +57,22 @@ export default async function handler(req, res) {
       });
     });
 
-    console.log('fields:', fields);
-    console.log('files:', files);
+    console.log("fields:", fields);
+    console.log("files:", files);
 
     // 必須フィールドチェック
-    const owner = Array.isArray(fields.owner)        ? fields.owner[0]        : fields.owner;
-    const repo  = Array.isArray(fields.repo)         ? fields.repo[0]         : fields.repo;
-    const filePath = Array.isArray(fields.path)      ? fields.path[0]         : fields.path;
-    const linkText = Array.isArray(fields.linkText)  ? fields.linkText[0]     : fields.linkText;
+    const owner = Array.isArray(fields.owner) ? fields.owner[0] : fields.owner;
+    const repo = Array.isArray(fields.repo) ? fields.repo[0] : fields.repo;
+    const filePath = Array.isArray(fields.path) ? fields.path[0] : fields.path;
+    const linkText = Array.isArray(fields.linkText)
+      ? fields.linkText[0]
+      : fields.linkText;
     const scenarioName = Array.isArray(fields.scenarioName)
-                          ? fields.scenarioName[0]
-                          : fields.scenarioName;
+      ? fields.scenarioName[0]
+      : fields.scenarioName;
 
     if (!owner || !repo || !filePath || !linkText || !scenarioName) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Missing parameters" });
+      return res.status(400).json({ ok: false, error: "Missing parameters" });
     }
 
     let htmlFile = files.htmlFile;
@@ -112,17 +106,20 @@ export default async function handler(req, res) {
     } catch (err) {
       if (err.status === 404) {
         // index.html がまだ存在しない場合は初期設定を促してクライアントにエラー返却
-        return res
-          .status(400)
-          .json({ ok: false, error: "index.html が存在しません。まず初期設定を行ってください。" });
+        return res.status(400).json({
+          ok: false,
+          error: "index.html が存在しません。まず初期設定を行ってください。",
+        });
       }
       throw err;
     }
 
     // 3) クライアント設定＆loglist.js 読み込みを挿入
-    if (!html.includes('window.CCU_CONFIG')) {
+    if (!html.includes("window.CCU_CONFIG")) {
       const configScript = `<script>
-    window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}', apiBase: '${process.env.API_BASE_URL || 'https://clu-dev.vercel.app'}' };
+    window.CCU_CONFIG = { owner: '${owner}', repo: '${repo}', apiBase: '${
+        process.env.API_BASE_URL || "https://clu-dev.vercel.app"
+      }' };
     </script>`;
       const loaderScript = `<script src="loglist.js"></script>`;
       html = html.replace(
@@ -139,13 +136,13 @@ export default async function handler(req, res) {
     data-path="${filePath}"
 >
   <span>
-    <span class="text-muted">${scenarioName}</span>
+    <span class="text-muted">${scenarioName}</span><br>
     <a href="${filePath}" class="ms-2">${linkText}</a>
   </span>
   <button type="button" class="btn btn-sm btn-danger btn-delete">削除</button>
 </li>
 `.trim();
-    
+
     // 5) <ul id="log-list"> の中に差し込む
     const hasLogList = /<ul[\s\S]*?\bid=["']log-list["'][\s\S]*?>/i.test(html);
     if (!hasLogList) {
@@ -155,7 +152,7 @@ export default async function handler(req, res) {
         `$1\n<ul id="log-list" class="list-group"></ul>`
       );
     }
-    
+
     // ここで必ず「既存 UL がある or いま挿入したUL」に <li> マージをかける
     html = html.replace(
       /(<ul[^>]+id=["']log-list["'][^>]*>)([\s\S]*?)(<\/ul>)/i,
@@ -164,14 +161,14 @@ export default async function handler(req, res) {
         const existingItems = oldInner.match(/<li[\s\S]*?<\/li>/g) || [];
         // newItem はアップロードされた分（定義済み）を追加
         const allItems = [...existingItems, newItem];
-    
+
         // 必要なら日付順ソートする
         allItems.sort((a, b) => {
           const da = a.match(/data-date="([^"]+)"/)[1];
           const db = b.match(/data-date="([^"]+)"/)[1];
           return new Date(db) - new Date(da); // 新しい順
         });
-    
+
         // join して戻す
         const combined = allItems.join("\n  ");
         return `${openTag}\n  ${combined}\n${closeTag}`;
@@ -189,9 +186,7 @@ export default async function handler(req, res) {
     // 7) 単一コミットでまとめてプッシュ (tree→commit→ref update)
     const { data: repoInfo } = await octokit.repos.get({ owner, repo });
     const branch = repoInfo.default_branch;
-    const {
-      data: refData,
-    } = await octokit.git.getRef({
+    const { data: refData } = await octokit.git.getRef({
       owner,
       repo,
       ref: `heads/${branch}`,
@@ -215,7 +210,9 @@ export default async function handler(req, res) {
         await octokit.repos.getContent({ owner, repo, path: asset });
       } catch (e) {
         if (e.status === 404) {
-          const blob = fs.readFileSync(path.join(process.cwd(), "public", asset));
+          const blob = fs.readFileSync(
+            path.join(process.cwd(), "public", asset)
+          );
           const { data } = await octokit.git.createBlob({
             owner,
             repo,
