@@ -26,10 +26,13 @@ async function getAuthenticatedUser(req) {
   }
 }
 
-// .github.io ドメインのみ許可
+const APP_ORIGIN = process.env.APP_ORIGIN || "https://ccfolialoguploader.com";
+
+// 既存の .github.io ドメインと APP_ORIGIN を許可
 function isOriginAllowed(origin, userOrigin) {
+  if (typeof origin !== "string") return false;
+  if (origin === APP_ORIGIN) return true;
   return (
-    typeof origin === "string" &&
     origin.endsWith(".github.io") &&
     (origin === process.env.TEMPLATE_ORIGIN || origin === userOrigin)
   );
