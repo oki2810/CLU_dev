@@ -1,10 +1,9 @@
 // norobot.js: Disable search engine indexing and enforce nofollow on all links
 (function() {
-  // <meta name="robots" content="noindex,nofollow"> がなければ追加
   if (!document.querySelector('meta[name="robots"]')) {
     var meta = document.createElement('meta');
     meta.name    = 'robots';
-    meta.content = 'noindex,nofollow';
+    meta.content = 'noindex, nofollow, noarchive, nosnippet, noimageindex, nocache';
     document.head.appendChild(meta);
   }
 
