@@ -40,13 +40,13 @@ export default async function handler(req, res) {
   const APP_ORIGIN = process.env.APP_ORIGIN || 'https://ccfolialoguploader.com';
 
   function isOriginAllowed(origin, userOrigin) {
+    if (typeof origin !== 'string') return false;
+    const lcOrigin = origin.toLowerCase();
     const allowed =
-      typeof origin === 'string' &&
-      (
-        origin === APP_ORIGIN ||
-        (origin.endsWith('.github.io') &&
-          (origin === TEMPLATE_ORIGIN || origin === userOrigin))
-      );
+      lcOrigin === APP_ORIGIN.toLowerCase() ||
+      (lcOrigin.endsWith('.github.io') &&
+        (lcOrigin === TEMPLATE_ORIGIN.toLowerCase() ||
+          lcOrigin === userOrigin.toLowerCase()));
     console.log('[apply-changes] Origin check', { origin, userOrigin, allowed });
     return allowed;
   }
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
   // --- OPTIONS（プリフライト） ---
   if (req.method === 'OPTIONS') {
     console.log('[apply-changes] Handling preflight OPTIONS');
-    if (origin && origin.endsWith('.github.io')) {
+    if (origin && origin.toLowerCase().endsWith('.github.io')) {
       setCorsHeaders(res, origin);
       return res.status(204).end();
     }
