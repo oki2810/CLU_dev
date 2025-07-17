@@ -112,7 +112,7 @@ export default async function handler(req, res) {
   }
 
   // オーナー一致チェック
-  if (owner !== username) {
+  if (owner.toLowerCase() !== username.toLowerCase()) {
     console.log('[apply-changes] Forbidden: owner mismatch', { owner, username });
     return res.status(403).json({ ok: false, error: 'Owner mismatch' });
   }

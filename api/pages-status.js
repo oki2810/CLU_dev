@@ -95,7 +95,7 @@ export default async function handler(req, res) {
   }
 
   // 6) オーナー一致チェック
-  if (owner !== auth.username) {
+  if (owner.toLowerCase() !== auth.username.toLowerCase()) {
     return res.status(403).json({ ok: false, error: "Owner mismatch" });
   }
 
