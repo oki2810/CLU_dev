@@ -31,10 +31,12 @@ const APP_ORIGIN = process.env.APP_ORIGIN || "https://ccfolialoguploader.com";
 // 既存の .github.io ドメインと APP_ORIGIN を許可
 function isOriginAllowed(origin, userOrigin) {
   if (typeof origin !== "string") return false;
-  if (origin === APP_ORIGIN) return true;
+  const lcOrigin = origin.toLowerCase();
   return (
-    origin.endsWith(".github.io") &&
-    (origin === process.env.TEMPLATE_ORIGIN || origin === userOrigin)
+    lcOrigin === APP_ORIGIN.toLowerCase() ||
+    (lcOrigin.endsWith(".github.io") &&
+      (lcOrigin === process.env.TEMPLATE_ORIGIN.toLowerCase() ||
+        lcOrigin === userOrigin.toLowerCase()))
   );
 }
 
@@ -53,7 +55,7 @@ export default async function handler(req, res) {
 
   // 1) プリフライト対応
   if (req.method === "OPTIONS") {
-    if (origin && origin.endsWith(".github.io")) {
+    if (origin && origin.toLowerCase().endsWith(".github.io")) {
       setCorsHeaders(res, origin);
       return res.status(204).end();
     }
