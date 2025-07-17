@@ -266,10 +266,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const reader = new FileReader();
         reader.onload = (e) => {
             let html = e.target.result;
-            const robotsMeta = '<meta name="robots" content="noindex,nofollow">';
+            const robotsMeta = '<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache">';
             const fontStyle =
                 '<style>* { font-family: sans-serif !important; }</style>';
-            const norobotScript = '<script src="../norobot.js"></scr' + 'ipt>';
+            const norobotScript = '<script src="norobot.js"></scr' + 'ipt>';
             html = html.replace(/<\/head>/i, robotsMeta + "\n" + fontStyle + "\n" +
                 norobotScript + "\n</head>");
             formattedOutput.textContent = html;
