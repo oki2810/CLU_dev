@@ -270,8 +270,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const fontStyle =
                 '<style>* { font-family: sans-serif !important; }</style>';
             const norobotScript = '<script src="norobot.js"></scr' + 'ipt>';
+            const reloadScript = '<script>if (!window.location.href.includes("forceReloaded")) { const sep = window.location.href.includes("?") ? "&" : "?"; window.location.href = window.location.href + sep + "forceReloaded=1"; }</script>';
             html = html.replace(/<\/head>/i, robotsMeta + "\n" + fontStyle + "\n" +
-                norobotScript + "\n</head>");
+                norobotScript + "\n" + reloadScript + "\n</head>");
             formattedOutput.textContent = html;
         };
         reader.readAsText(uploadHtml.files[0]);
