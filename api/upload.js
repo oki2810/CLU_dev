@@ -83,6 +83,19 @@ export default async function handler(req, res) {
     }
     const octokit = new Octokit({ auth: token });
 
+    // 既存ファイルの有無をチェックし、存在する場合はエラーを返す
+    try {
+      await octokit.repos.getContent({ owner, repo, path: filePath });
+      return res
+        .status(400)
+        .json({ ok: false, error: "同名のログが存在します" });
+    } catch (err) {
+      if (err.status !== 404) {
+        throw err;
+      }
+      // status === 404 の場合は新規ファイルとして続行
+    }
+
     // 1) アップロードされたログファイルを blob 化
     const buffer = fs.readFileSync(tempPath);
     const fileB64 = buffer.toString("base64");
