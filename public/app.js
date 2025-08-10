@@ -245,7 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const pagesUrl =
                     `https://github.com/${ownerName}/${repo}/settings/pages`;
                 initStatus.innerHTML =
-                    `<div class="alert alert-success">リポジトリ作成が完了しました！<br>こちら<a href="${pagesUrl}" target="_blank" rel="noopener noreferrer">${pagesUrl}</a>からPage設定を行ってください！</div>`;
+                    `<div class="alert alert-success">リポジトリ作成が完了しました！<br><a href="${pagesUrl}" target="_blank" rel="noopener noreferrer">${pagesUrl}</a>からPage設定を行ってください！</div>`;
                 updateViewBtn();
             } else {
                 initStatus.innerHTML =
