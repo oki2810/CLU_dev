@@ -82,6 +82,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "No file uploaded" });
     }
     const octokit = new Octokit({ auth: token });
+    // GitHub Pages の最新ビルド状況を確認し、進行中であればエラーを返す
+    try {
+      const { data } = await octokit.rest.repos.getLatestPagesBuild({
+        owner,
+        repo,
+      });
+      if (data.status === "building" || data.status === "queued") {
+        return res
+          .status(409)
+          .json({
+            ok: false,
+            error: "現在デプロイ中です。しばらく経ってから再度コミットしてください。",
+          });
+      }
+    } catch (err) {
+      if (err.status !== 404) {
+        throw err;
+      }
+      // 404 の場合はビルド履歴がないため、そのまま続行
+    }
 
     // 既存ファイルの有無をチェックし、存在する場合はエラーを返す
     try {

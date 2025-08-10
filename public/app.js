@@ -299,6 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         githubStatus.textContent = "送信中…";
+        githubUploadBtn.disabled = true;
 
         try {
             // 1) FormData 組み立て
@@ -350,6 +351,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("通信中にエラー:", err);
             githubStatus.innerHTML =
                 `<div class="alert alert-danger">通信エラーが発生しました</div>`;
+        } finally {
+            githubUploadBtn.disabled = false;
         }
     });
 });
